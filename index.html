@@ -7,11 +7,6 @@
 <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
-<script>
-  // 先在主程式載入前清空全部 localStorage
-  localStorage.clear();
-</script>
-
 <!-- 登入驗證遮罩 -->
 <div id="login-overlay" style="position:fixed; top:0; left:0; width:100%; height:100%; background:#f5f7fa; z-index:9999; display:flex; justify-content:center; align-items:center;">
     <div style="background:white; padding:30px; border-radius:12px; box-shadow:0 4px 15px rgba(0,0,0,0.1); width:320px; text-align:center;">
@@ -105,37 +100,54 @@
 
 <script type="module" src="src/app.js"></script>
 <script>
-document.getElementById('login-btn').addEventListener('click', async () => {
-    const user = document.getElementById('login-user').value.trim();
-    const pass = document.getElementById('login-pass').value.trim();
-    const msgEl = document.getElementById('login-msg');
-    
-    if (!user || !pass) {
-        msgEl.textContent = "請輸入帳號與密碼";
-        return;
-    }
-    
-    msgEl.textContent = "正在驗證中...";
-    
-    const scriptUrl = "https://script.google.com/macros/s/AKfycbwTqq9cHd27xd9Lk2oZqqfcsmFR8Mdmog0wCRvljOpCFQPAERSj31tqNAZqfYc7NUX_/exec"; 
-    
-    try {
-        let response = await fetch(scriptUrl, {
-            method: "POST",
-            body: JSON.stringify({ username: user, password: pass })
-        });
-        
-        let result = await response.json();
-        
-        if (result.status === "success") {
-            document.getElementById('login-overlay').style.display = 'none';
-        } else {
-            msgEl.textContent = result.message;
-        }
-    } catch (err) {
-        console.error(err);
-        msgEl.textContent = "連線失敗，請檢查網路或網址是否正確";
-    }
+const TOKEN_KEY = "spellAgent.authToken";
+
+async function verifyToken(token) {
+  const response = await fetch("/api/me", {
+    headers: { Authorization: ["Bearer", token].join(" ") },
+  });
+  return response.ok;
+}
+
+async function login(username, password) {
+  const response = await fetch("/api/login", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ username, password }),
+  });
+  const result = await response.json();
+  if (!response.ok) throw new Error(result.message || "登入失敗");
+  return result;
+}
+
+(async function tryAutoLogin() {
+  const token = localStorage.getItem(TOKEN_KEY);
+  if (!token) return;
+  if (await verifyToken(token)) {
+    document.getElementById("login-overlay").style.display = "none";
+    return;
+  }
+  localStorage.removeItem(TOKEN_KEY);
+})();
+
+document.getElementById("login-btn").addEventListener("click", async () => {
+  const user = document.getElementById("login-user").value.trim();
+  const pass = document.getElementById("login-pass").value.trim();
+  const msgEl = document.getElementById("login-msg");
+
+  if (!user || !pass) {
+    msgEl.textContent = "請輸入帳號與密碼";
+    return;
+  }
+
+  msgEl.textContent = "正在驗證中...";
+  try {
+    const result = await login(user, pass);
+    localStorage.setItem(TOKEN_KEY, result.token);
+    document.getElementById("login-overlay").style.display = "none";
+  } catch (err) {
+    msgEl.textContent = err.message || "登入失敗";
+  }
 });
 </script>
 </body>

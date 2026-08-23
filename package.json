@@ -1,0 +1,22 @@
+{
+  "name": "tes",
+  "version": "1.0.0",
+  "description": "A spelling trainer for kids learning English (Taiwan 國中 2000-word list). Built for phonics (自然拼音) learners who read fine but struggle to **spell**. All ~2000 words are graded into **5 levels**; a short **placement test** finds where the student belongs, then it plays as a **level-up game** — practice a level, and once your accuracy passes **80%** you can take the **level challenge** to climb to the next one. Every word shows its **Chinese meaning, KK phonetic, and an example sentence**. Audio, spaced repetition, and a progress dashboard throughout.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "echo \"No automated tests configured\""
+  },
+  "repository": {
+    "type": "git",
+    "url": "http://localhost:26831/pmpu4000-stack/tes"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "better-sqlite3": "^13.0.3",
+    "express": "^5.2.1",
+    "jsonwebtoken": "^9.0.3"
+  }
+}

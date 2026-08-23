@@ -7,27 +7,38 @@ as a **level-up game** — practice a level, and once your accuracy passes **80%
 **level challenge** to climb to the next one. Every word shows its **Chinese meaning, KK phonetic, and an
 example sentence**. Audio, spaced repetition, and a progress dashboard throughout.
 
-**Vanilla JavaScript (ES modules) — no framework, no build step, no dependencies.**
-It just needs to be *served* over http (a one-line local server, or GitHub Pages), because
-browsers block ES modules when a page is opened directly from `file://`.
+**Vanilla JavaScript (ES modules) frontend + minimal Node.js API backend (SQLite).**
+No frontend build step. Run one Node server that serves both static files and APIs.
 
 ---
 
 ## How to run it
 
-### Option 1 — Local (one command, works offline)
-From this folder, start any static server and open the page:
+### Option 1 — Local backend + frontend (recommended)
+From this folder:
 
 ```bash
-python3 -m http.server 8000
-# then open http://localhost:8000/ in your browser
+npm install
+npm start
+# then open http://localhost:3000/ in your browser
 ```
 
-(Any static server works — VS Code's "Live Server" extension, `npx serve`, etc.)
+Default seeded users for local testing:
+- `studentA / pass1234`
+- `studentB / pass1234`
 
-### Option 2 — GitHub Pages (best for iPad / sharing a link)
+You can override seeds before first run:
 
-> Not enabled yet — these are the steps to turn it on whenever you want.
+```bash
+SEED_USERS="alice:pw1,bob:pw2" npm start
+```
+
+Usage log and auth data are persisted in `server-data/app.db`.
+
+### Option 2 — Static-only hosting
+
+> This project now needs backend APIs for login + usage logs, so static-only hosting
+> cannot provide the full authenticated experience.
 
 **Method A — web UI:**
 1. Go to the repo **Settings → Pages → Build and deployment → Source: _Deploy from a branch_**.
@@ -46,15 +57,13 @@ Because `index.html` is the entry point, the Pages link is just the clean root U
 
 ## Can my friend run it? Is setup hard?
 
-**No install, no build, no dependencies** — but it does need to be *served* (not double-clicked),
-since it uses ES modules. Easiest paths:
+No frontend build is needed, but this version requires the backend API server.
 
-- **Open the GitHub Pages link** (Option 2) — nothing to install, works on any device.
-- **Or** run `python3 -m http.server` in the folder and open `http://localhost:8000/`.
+- Run `npm install && npm start`, then open `http://localhost:3000/`.
 
 ### Good to know
-- Each person's **progress is saved privately in their own browser** (`localStorage`),
-  so two kids keep separate scores. Nothing is uploaded anywhere.
+- Practice progress is still stored in browser `localStorage`.
+- **Usage logs** are stored in backend SQLite and are bound to authenticated user identity.
 - **Audio** uses the browser's built-in text-to-speech (Chrome / Safari / Edge on
   Mac / Windows / iPad / Android all have English voices). If a device has no English
   voice, the **偷看 (peek)** and answer-reveal still show the word, so practice isn't blocked.
@@ -141,3 +150,18 @@ ECDICT is MIT-licensed (Copyright © 2025 Linwei); its attribution and full lice
 ## License
 This project is MIT-licensed — see [LICENSE](LICENSE). It also redistributes third-party
 dictionary data (ECDICT); see [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md) for attributions.
+
+---
+
+## Usage logs API (authenticated)
+
+- `POST /api/usage-logs` body: `{ "action": "answer", "detail": { ... } }`
+- `GET /api/usage-logs?limit=20&offset=0`
+
+`user_id` is always taken from validated token identity on the backend.
+Client-supplied `user_id` is ignored.
+
+### Minimal manual verification
+1. Login as `studentA`, create logs, and list logs from API.
+2. Login as `studentB`, list logs, confirm `studentA` records are not returned.
+3. Call usage-log APIs without token (or with invalid token), confirm `401`.

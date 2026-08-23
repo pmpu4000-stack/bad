@@ -7,6 +7,7 @@ import * as store from "./store.js";
 import { nextWord } from "./srs.js";
 import * as ui from "./ui.js";
 import { burst } from "./confetti.js";
+import { createUsageLog, fetchUsageLogs } from "./usageLogsApi.js";
 import {
   LEVELS, levelColor, levelName, sample,
   PASS_RATE, GATE_MIN_ATTEMPTS, CHALLENGE_LEN, PLACEMENT_PER_LEVEL, DAILY_GOAL,
@@ -16,6 +17,10 @@ let WORDS = [];
 const state = { mode: "listen", word: null, answered: false, round: null };
 
 const wordsAt = (level) => WORDS.filter((w) => w.level === level);
+
+function logUsage(action, detail = null) {
+  createUsageLog(action, detail).catch(() => {});
+}
 
 function levelInfo() {
   const prog = store.progress();
@@ -67,6 +72,12 @@ function answer(correct) {
   if (state.answered) return;
   state.answered = true;
   const info = store.grade(state.word.id, correct, store.progress().current);
+  logUsage("answer", {
+    wordId: state.word.id,
+    mode: state.mode,
+    correct,
+    level: store.progress().current,
+  });
   ui.showResult(correct, state.word, info);
   if (correct) burst();
   refreshChrome();
@@ -76,8 +87,16 @@ function answer(correct) {
 function pickLevel(n) { store.setCurrentLevel(n); refreshChrome(); newRound(); }
 
 // ---- today's training session ----
-function onSessionStart() { store.sessionStart(); refreshChrome(); }
-function onSessionEnd() { showSessionSummary(store.sessionEnd()); }
+function onSessionStart() {
+  store.sessionStart();
+  logUsage("session_start", { level: store.progress().current });
+  refreshChrome();
+}
+function onSessionEnd() {
+  const summary = store.sessionEnd();
+  logUsage("session_end", summary);
+  showSessionSummary(summary);
+}
 
 function showSessionSummary(sum) {
   ui.setScreen("quiz");
@@ -177,4 +196,9 @@ ui.onPlace(() => startPlacement());
   }
   if (store.progress().placed) { ui.setScreen("play"); refreshChrome(); newRound(); }
   else startPlacement();
+
+  window.usageLogsApi = {
+    create: (action, detail) => createUsageLog(action, detail),
+    list: (options) => fetchUsageLogs(options),
+  };
 })();
