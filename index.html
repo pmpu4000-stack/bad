@@ -101,10 +101,7 @@
 <script type="module" src="src/app.js"></script>
 <script>
 const existingUser = sessionStorage.getItem("currentUser");
-if (existingUser) {
-    document.getElementById('login-user').value = existingUser;
-    document.getElementById('login-overlay').style.display = 'none';
-}
+if (existingUser) document.getElementById('login-user').value = existingUser;
 
 document.getElementById('login-btn').addEventListener('click', async () => {
     const user = document.getElementById('login-user').value.trim();
@@ -117,8 +114,8 @@ document.getElementById('login-btn').addEventListener('click', async () => {
     }
     
     msgEl.textContent = "正在驗證中...";
-    
-    const scriptUrl = "https://script.google.com/macros/s/AKfycbwTqq9cHd27xd9Lk2oZqqfcsmFR8Mdmog0wCRvljOpCFQPAERSj31tqNAZqfYc7NUX_/exec"; 
+
+    const scriptUrl = "https://script.google.com/macros/s/AKfycbwTqq9cHd27xd9Lk2oZqqfcsmFR8Mdmog0wCRvljOpCFQPAERSj31tqNAZqfYc7NUX_/exec";
     
     try {
         let response = await fetch(scriptUrl, {

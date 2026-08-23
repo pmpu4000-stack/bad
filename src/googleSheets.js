@@ -4,7 +4,6 @@ const SHEET_API_URL =
 async function post(payload) {
   const response = await fetch(SHEET_API_URL, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
   if (!response.ok) throw new Error(`HTTP ${response.status}`);
