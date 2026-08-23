@@ -228,3 +228,33 @@ canvas#fx{position:fixed;inset:0;pointer-events:none;z-index:50}
   .title h1{font-size:20px} .tile{width:40px;height:48px;font-size:22px}
   .lvchip{min-width:96px} .banner .gate{flex-wrap:wrap} .banner .challenge{margin-left:0;width:100%}
 }
+/* ==================================================
+   自動跟隨系統深色模式 (解決寫死顏色蓋掉變數的問題)
+   ================================================== */
+@media (prefers-color-scheme: dark) {
+  /* 1. 全域背景與文字 */
+  html, body {
+    background-color: #0F172A !important;
+    color: #F8FAFC !important;
+  }
+
+  /* 2. 中間小白卡片與區域底色 */
+  .card, #card, .quizcard, .progress, section, .stat {
+    background-color: #1E293B !important;
+    border-color: #334155 !important;
+    color: #F8FAFC !important;
+  }
+
+  /* 3. 「在此處拼字...」輸入框與提示區塊 */
+  .stage, #stage, 
+  .stage input, input[type="text"] {
+    background-color: #334155 !important;
+    color: #FFFFFF !important;
+    border-color: #475569 !important;
+  }
+
+  /* 4. 底部說明文字與提示文字 */
+  .banner, #banner, .legend, .defs, p, span {
+    color: #CBD5E1 !important;
+  }
+}
