@@ -7,6 +7,7 @@ import * as store from "./store.js";
 import { nextWord } from "./srs.js";
 import * as ui from "./ui.js";
 import { burst } from "./confetti.js";
+import { uploadProgress, downloadProgress } from "./googleSheets.js";
 import {
   LEVELS, levelColor, levelName, sample,
   PASS_RATE, GATE_MIN_ATTEMPTS, CHALLENGE_LEN, PLACEMENT_PER_LEVEL, DAILY_GOAL,
@@ -74,6 +75,30 @@ function answer(correct) {
 }
 
 function pickLevel(n) { store.setCurrentLevel(n); refreshChrome(); newRound(); }
+
+function currentUser() {
+  return sessionStorage.getItem("currentUser") || "";
+}
+
+async function handleUpload() {
+  const username = currentUser();
+  if (!username) { ui.note("請先登入再上傳"); return; }
+  ui.note("☁️ 上傳中...");
+  const result = await uploadProgress(username, store.exportData());
+  ui.note(result.success ? "✅ 進度已上傳" : `❌ ${result.message}`);
+}
+
+async function handleDownload() {
+  const username = currentUser();
+  if (!username) { ui.note("請先登入再下載"); return; }
+  ui.note("📱 下載中...");
+  const result = await downloadProgress(username);
+  if (!result.success) { ui.note(`❌ ${result.message}`); return; }
+  if (!store.importData(result.data)) { ui.note("❌ 下載資料格式錯誤"); return; }
+  refreshChrome();
+  newRound();
+  ui.note("✅ 進度已載入");
+}
 
 // ---- today's training session ----
 function onSessionStart() { store.sessionStart(); refreshChrome(); }
@@ -165,6 +190,8 @@ ui.onPeek(() => { if (state.word) ui.peek(state.word); });
 ui.onReset(() => { if (confirm("確定要清除所有進度嗎？（會重新測程度）")) { store.reset(); startPlacement(); } });
 ui.onSummary(() => ui.toggleSummary(store.summary(WORDS)));
 ui.onPlace(() => startPlacement());
+document.querySelector("#s-upload")?.addEventListener("click", handleUpload);
+document.querySelector("#s-download")?.addEventListener("click", handleDownload);
 
 // ---- boot ----
 (async function boot() {

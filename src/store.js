@@ -56,6 +56,33 @@ function load() {
 let DB = load();
 function save() { try { localStorage.setItem(LS_KEY, JSON.stringify(DB)); } catch { /* storage off */ } }
 
+export function exportData() {
+  return JSON.stringify(DB);
+}
+
+export function importData(json) {
+  try {
+    const parsed = typeof json === "string" ? JSON.parse(json) : json;
+    if (!parsed || typeof parsed !== "object") return false;
+    if (!parsed.box || !parsed.stat || !parsed.lstat || !parsed.level) return false;
+    const base = fresh();
+    DB = {
+      ...base,
+      ...parsed,
+      box: { ...(parsed.box || {}) },
+      stat: { ...(parsed.stat || {}) },
+      lstat: { ...(parsed.lstat || {}) },
+      level: { ...base.level, ...(parsed.level || {}) },
+      session: { ...base.session, ...(parsed.session || {}) },
+      history: { ...(parsed.history || {}) },
+    };
+    save();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export function box(id) { return DB.box[id] || 0; }
 export function everWrong(id) { return !!(DB.stat[id] && DB.stat[id].ew); }
 export function correctCount(id) { return DB.stat[id] ? DB.stat[id].c : 0; }
