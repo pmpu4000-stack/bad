@@ -7,7 +7,7 @@ import * as store from "./store.js";
 import { nextWord } from "./srs.js";
 import * as ui from "./ui.js";
 import { burst } from "./confetti.js";
-import { createUsageLog, fetchUsageLogs } from "./usageLogsApi.js";
+import { createUsageLog } from "./usageLogsApi.js";
 import {
   LEVELS, levelColor, levelName, sample,
   PASS_RATE, GATE_MIN_ATTEMPTS, CHALLENGE_LEN, PLACEMENT_PER_LEVEL, DAILY_GOAL,
@@ -197,8 +197,4 @@ ui.onPlace(() => startPlacement());
   if (store.progress().placed) { ui.setScreen("play"); refreshChrome(); newRound(); }
   else startPlacement();
 
-  window.usageLogsApi = {
-    create: (action, detail) => createUsageLog(action, detail),
-    list: (options) => fetchUsageLogs(options),
-  };
 })();

@@ -7,16 +7,13 @@
     "start": "node server.js",
     "test": "echo \"No automated tests configured\""
   },
-  "repository": {
-    "type": "git",
-    "url": "http://localhost:26831/pmpu4000-stack/tes"
-  },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
     "better-sqlite3": "^13.0.3",
     "express": "^5.2.1",
+    "express-rate-limit": "^8.6.2",
     "jsonwebtoken": "^9.0.3"
   }
 }

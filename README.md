@@ -23,15 +23,16 @@ npm start
 # then open http://localhost:3000/ in your browser
 ```
 
-Default seeded users for local testing:
-- `studentA / pass1234`
-- `studentB / pass1234`
-
-You can override seeds before first run:
+Set seeded users before first run:
 
 ```bash
 SEED_USERS="alice:pw1,bob:pw2" npm start
 ```
+
+If `SEED_USERS` is omitted on local startup, the server auto-generates random passwords for
+`studentA`/`studentB` once and stores them in `server-data/generated-users.json`.
+
+For production, set both `JWT_SECRET` and `SEED_USERS` before first startup.
 
 Usage log and auth data are persisted in `server-data/app.db`.
 
@@ -162,6 +163,6 @@ dictionary data (ECDICT); see [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md) f
 Client-supplied `user_id` is ignored.
 
 ### Minimal manual verification
-1. Login as `studentA`, create logs, and list logs from API.
-2. Login as `studentB`, list logs, confirm `studentA` records are not returned.
+1. Login as seeded user A, create logs, and list logs from API.
+2. Login as seeded user B, list logs, confirm user A records are not returned.
 3. Call usage-log APIs without token (or with invalid token), confirm `401`.

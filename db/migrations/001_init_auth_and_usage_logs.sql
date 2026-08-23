@@ -11,7 +11,7 @@ CREATE TABLE IF NOT EXISTS usage_logs (
   action TEXT NOT NULL,
   detail TEXT,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY(user_id) REFERENCES users(id)
+  FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
 CREATE INDEX IF NOT EXISTS idx_usage_logs_user_created_at

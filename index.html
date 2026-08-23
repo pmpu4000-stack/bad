@@ -99,8 +99,8 @@
 </div>
 
 <script type="module" src="src/app.js"></script>
-<script>
-const TOKEN_KEY = "spellAgent.authToken";
+<script type="module">
+import { TOKEN_KEY } from "./src/usageLogsApi.js";
 
 async function verifyToken(token) {
   const response = await fetch("/api/me", {
@@ -132,7 +132,7 @@ async function login(username, password) {
 
 document.getElementById("login-btn").addEventListener("click", async () => {
   const user = document.getElementById("login-user").value.trim();
-  const pass = document.getElementById("login-pass").value.trim();
+  const pass = document.getElementById("login-pass").value;
   const msgEl = document.getElementById("login-msg");
 
   if (!user || !pass) {

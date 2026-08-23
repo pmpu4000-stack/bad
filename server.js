@@ -5,14 +5,36 @@ const path = require("node:path");
 const express = require("express");
 const Database = require("better-sqlite3");
 const jwt = require("jsonwebtoken");
+const rateLimit = require("express-rate-limit");
 
 const app = express();
 const PORT = Number(process.env.PORT || 3000);
-const JWT_SECRET = process.env.JWT_SECRET || "dev-only-change-this-secret";
-const TOKEN_EXPIRES_IN = process.env.TOKEN_EXPIRES_IN || "7d";
+const IS_PRODUCTION = process.env.NODE_ENV === "production";
 const DATA_DIR = path.join(__dirname, "server-data");
 const DB_PATH = path.join(DATA_DIR, "app.db");
 const MIGRATION_PATH = path.join(__dirname, "db", "migrations", "001_init_auth_and_usage_logs.sql");
+const DEV_SECRET_PATH = path.join(DATA_DIR, "jwt-secret.txt");
+const DEV_USERS_PATH = path.join(DATA_DIR, "generated-users.json");
+const TOKEN_EXPIRES_IN = process.env.TOKEN_EXPIRES_IN || "7d";
+
+function resolveJwtSecret() {
+  if (process.env.JWT_SECRET) return process.env.JWT_SECRET;
+  if (IS_PRODUCTION) throw new Error("JWT_SECRET is required in production.");
+  fs.mkdirSync(DATA_DIR, { recursive: true });
+  if (fs.existsSync(DEV_SECRET_PATH)) return fs.readFileSync(DEV_SECRET_PATH, "utf8").trim();
+  const generated = crypto.randomBytes(48).toString("base64url");
+  fs.writeFileSync(DEV_SECRET_PATH, generated, { mode: 0o600 });
+  console.warn(`Generated development JWT secret at ${DEV_SECRET_PATH}`);
+  return generated;
+}
+
+const JWT_SECRET = resolveJwtSecret();
+
+try {
+  jwt.sign({ probe: true }, JWT_SECRET, { expiresIn: TOKEN_EXPIRES_IN });
+} catch {
+  throw new Error("TOKEN_EXPIRES_IN is invalid.");
+}
 
 fs.mkdirSync(DATA_DIR, { recursive: true });
 
@@ -31,22 +53,42 @@ function verifyPassword(password, storedHash) {
   const [salt, hash] = String(storedHash || "").split(":");
   if (!salt || !hash) return false;
   const candidate = crypto.scryptSync(password, salt, 64).toString("hex");
-  return crypto.timingSafeEqual(Buffer.from(hash, "hex"), Buffer.from(candidate, "hex"));
+  try {
+    const stored = Buffer.from(hash, "hex");
+    const actual = Buffer.from(candidate, "hex");
+    if (stored.length !== actual.length) return false;
+    return crypto.timingSafeEqual(stored, actual);
+  } catch {
+    return false;
+  }
 }
 
 function seedUsersIfEmpty() {
   const count = db.prepare("SELECT COUNT(*) AS count FROM users").get().count;
   if (count > 0) return;
 
-  const defaultUsers = process.env.SEED_USERS
+  const seededUsers = process.env.SEED_USERS
     ? process.env.SEED_USERS.split(",").map((entry) => {
-      const [username, password] = entry.split(":");
-      return { username: username?.trim(), password: password?.trim() };
-    }).filter((u) => u.username && u.password)
+      const sep = entry.indexOf(":");
+      if (sep <= 0) return null;
+      const username = entry.slice(0, sep).trim();
+      const password = entry.slice(sep + 1);
+      return { username, password };
+    }).filter((u) => u && u.username && u.password)
+    : [];
+  if (IS_PRODUCTION && seededUsers.length === 0) {
+    throw new Error("SEED_USERS is required in production when initializing an empty database.");
+  }
+  const defaultUsers = seededUsers.length > 0
+    ? seededUsers
     : [
-      { username: "studentA", password: "pass1234" },
-      { username: "studentB", password: "pass1234" },
+      { username: "studentA", password: crypto.randomBytes(9).toString("base64url") },
+      { username: "studentB", password: crypto.randomBytes(9).toString("base64url") },
     ];
+  if (seededUsers.length === 0) {
+    fs.writeFileSync(DEV_USERS_PATH, JSON.stringify(defaultUsers, null, 2), { mode: 0o600 });
+    console.warn(`SEED_USERS not provided. Generated development users at ${DEV_USERS_PATH}`);
+  }
 
   const insert = db.prepare("INSERT INTO users (username, password_hash) VALUES (?, ?)");
   const tx = db.transaction((users) => {
@@ -58,6 +100,12 @@ function seedUsersIfEmpty() {
 seedUsersIfEmpty();
 
 app.use(express.json({ limit: "64kb" }));
+app.use(rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 300,
+  standardHeaders: true,
+  legacyHeaders: false,
+}));
 
 function authMiddleware(req, res, next) {
   const auth = req.headers.authorization;
@@ -69,7 +117,12 @@ function authMiddleware(req, res, next) {
   const token = auth.slice("Bearer ".length);
   try {
     const payload = jwt.verify(token, JWT_SECRET);
-    req.user = { id: Number(payload.sub), username: payload.username };
+    const userId = Number(payload.sub);
+    if (!Number.isFinite(userId)) {
+      res.status(401).json({ message: "Invalid token" });
+      return;
+    }
+    req.user = { id: userId, username: payload.username };
     next();
   } catch {
     res.status(401).json({ message: "Invalid token" });
@@ -90,7 +143,7 @@ app.post("/api/login", (req, res) => {
     return;
   }
 
-  const token = jwt.sign({ sub: user.id, username: user.username }, JWT_SECRET, { expiresIn: TOKEN_EXPIRES_IN });
+  const token = jwt.sign({ sub: String(user.id), username: user.username }, JWT_SECRET, { expiresIn: TOKEN_EXPIRES_IN });
   res.json({ token, user: { id: user.id, username: user.username } });
 });
 
@@ -100,15 +153,24 @@ app.get("/api/me", authMiddleware, (req, res) => {
 
 app.post("/api/usage-logs", authMiddleware, (req, res) => {
   const action = String(req.body?.action || "").trim();
-  const detail = req.body?.detail === undefined ? null : req.body.detail;
+  const detail = req.body?.detail;
   if (!action) {
     res.status(400).json({ message: "action is required" });
     return;
   }
+  if (action.length > 255) {
+    res.status(400).json({ message: "action is too long" });
+    return;
+  }
+  if (detail !== undefined && detail !== null && typeof detail !== "object") {
+    res.status(400).json({ message: "detail must be an object, array, or null" });
+    return;
+  }
+  const detailText = detail === undefined || detail === null ? null : JSON.stringify(detail);
 
   const result = db.prepare(
     "INSERT INTO usage_logs (user_id, action, detail) VALUES (?, ?, ?)"
-  ).run(req.user.id, action, detail === null ? null : JSON.stringify(detail));
+  ).run(req.user.id, action, detailText);
 
   const created = db.prepare(
     "SELECT id, user_id, action, detail, created_at FROM usage_logs WHERE id = ?"
@@ -133,7 +195,7 @@ app.get("/api/usage-logs", authMiddleware, (req, res) => {
     `SELECT id, user_id, action, detail, created_at
      FROM usage_logs
      WHERE user_id = ?
-     ORDER BY id DESC
+     ORDER BY created_at DESC, id DESC
      LIMIT ? OFFSET ?`
   ).all(req.user.id, limit, offset);
 
@@ -150,9 +212,13 @@ app.get("/api/usage-logs", authMiddleware, (req, res) => {
   });
 });
 
-app.use(express.static(__dirname));
+app.get("/", (_, res) => {
+  res.sendFile(path.join(__dirname, "index.html"));
+});
+app.use("/css", express.static(path.join(__dirname, "css")));
+app.use("/src", express.static(path.join(__dirname, "src")));
+app.use("/data", express.static(path.join(__dirname, "data")));
 
 app.listen(PORT, () => {
-  // eslint-disable-next-line no-console
   console.log(`Server running at http://localhost:${PORT}`);
 });
