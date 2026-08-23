@@ -8,11 +8,6 @@
 </head>
 <body>
 
-  <script>
-    // 1. 開啟網頁時立即清空 LocalStorage，確保登入前的環境完全乾淨
-    localStorage.clear();
-  </script>
-
   <!-- 登入驗證遮罩 -->
   <div id="login-overlay" style="position:fixed; top:0; left:0; width:100%; height:100%; background:#f5f7fa; z-index:9999; display:flex; justify-content:center; align-items:center;">
     <div style="background:white; padding:30px; border-radius:12px; box-shadow:0 4px 15px rgba(0,0,0,0.1); width:320px; text-align:center;">
@@ -107,8 +102,14 @@
   <script>
     const scriptUrl = "https://script.google.com/macros/s/AKfycbwTqq9cHd27xd9Lk2oZqqfcsmFR8Mdmog0wCRvljOpCFQPAERSj31tqNAZqfYc7NUX_/exec";
 
-    // 綁定上傳按鈕點擊事件
+    // 檢查目前登入狀態與綁定事件
     document.addEventListener("DOMContentLoaded", () => {
+      const currentUser = localStorage.getItem("current_user");
+      // 只要已經驗證成功過，就隱藏登入視窗
+      if (currentUser) {
+        document.getElementById('login-overlay').style.display = 'none';
+      }
+
       const uploadBtn = document.getElementById("btn-upload") || document.querySelector(".stat.upload");
       if (uploadBtn) {
         uploadBtn.style.cursor = "pointer";
@@ -116,7 +117,7 @@
       }
     });
 
-    // 2. 登入驗證、抓取雲端紀錄、寫入 LocalStorage 並刷新
+    // 登入驗證、抓取雲端紀錄並還原
     document.getElementById('login-btn').addEventListener('click', async () => {
       const user = document.getElementById('login-user').value.trim();
       const pass = document.getElementById('login-pass').value.trim();
@@ -137,7 +138,7 @@
         let result = await response.json();
 
         if (result.status === "success") {
-          // 確保僅在登入成功後設定當前帳號與載入雲端紀錄
+          // 僅在點擊「確認登入」且驗證成功時才清空前一使用者的舊資料
           localStorage.clear();
           localStorage.setItem("current_user", user);
 
@@ -149,7 +150,7 @@
 
           alert(result.records ? "登入成功！已載入雲端紀錄。" : "登入成功！開啓全新學習進度。");
           
-          // 重新載入網頁，讓 app.js 讀取剛存入 localstorage 的資料
+          // 重新載入，此時 current_user 已存在，就不會再彈出登入頁面
           location.reload();
         } else {
           msgEl.textContent = result.message;
@@ -160,7 +161,7 @@
       }
     });
 
-    // 3. 上傳 LocalStorage 紀錄至 Google 試算表
+    // 上傳 LocalStorage 紀錄至 Google 試算表
     async function uploadLocalStorageData() {
       const currentUser = localStorage.getItem("current_user");
 
