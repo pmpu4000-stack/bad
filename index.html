@@ -1,4 +1,5 @@
 <script>
+const GAS_URL = "https://script.google.com/macros/s/AKfycbwTqq9cHd27xd9Lk2oZqqfcsmFR8Mdmog0wCRvljOpCFQPAERSj31tqNAZqfYc7NUX_/exec";
 let appStarted = false;
 let autosaveTimer = null;
 
@@ -15,70 +16,57 @@ function getCurrentUser() {
   return localStorage.getItem("currentUser") || "";
 }
 
-async function loadUserProgress(username) {
-  const scriptUrl = "https://script.google.com/macros/s/AKfycbwTqq9cHd27xd9Lk2oZqqfcsmFR8Mdmog0wCRvljOpCFQPAERSj31tqNAZqfYc7NUX_/exec";
-
-  const response = await fetch(scriptUrl, {
+async function gasPost(payload) {
+  const res = await fetch(GAS_URL, {
     method: "POST",
-    body: JSON.stringify({ action: "load", username })
+    body: JSON.stringify(payload)
   });
-
-  const result = await response.json();
-  if (result.status !== "success") {
-    throw new Error(result.message || "載入紀錄失敗");
+  const json = await res.json();
+  if (json.status !== "success") {
+    throw new Error(json.message || "GAS request failed");
   }
+  return json;
+}
 
+async function loadUserProgress(username) {
+  const result = await gasPost({ action: "load", username });
   let data = result.data || {};
+
   if (typeof data === "string") {
     try { data = JSON.parse(data); } catch (_) { data = {}; }
   }
 
-  // 確保清空後再載入
   localStorage.clear();
-
-  Object.entries(data).forEach(([key, value]) => {
-    localStorage.setItem(key, typeof value === "string" ? value : JSON.stringify(value));
+  Object.entries(data).forEach(([k, v]) => {
+    localStorage.setItem(k, typeof v === "string" ? v : JSON.stringify(v));
   });
 }
 
 async function saveUserProgress(username) {
   if (!username) return;
 
-  const scriptUrl = "https://script.google.com/macros/s/AKfycbwTqq9cHd27xd9Lk2oZqqfcsmFR8Mdmog0wCRvljOpCFQPAERSj31tqNAZqfYc7NUX_/exec";
-
-  // 打包 localStorage
   const data = {};
   for (let i = 0; i < localStorage.length; i++) {
     const k = localStorage.key(i);
     data[k] = localStorage.getItem(k);
   }
 
-  const response = await fetch(scriptUrl, {
-    method: "POST",
-    body: JSON.stringify({
-      action: "save",
-      username,
-      data
-    })
+  await gasPost({
+    action: "save",
+    username,
+    data
   });
-
-  const result = await response.json();
-  if (result.status !== "success") {
-    throw new Error(result.message || "儲存失敗");
-  }
 }
 
 function setupAutoSave() {
   if (autosaveTimer) clearInterval(autosaveTimer);
 
-  // 每 10 秒自動存一次
   autosaveTimer = setInterval(() => {
     const u = getCurrentUser();
     if (!u) return;
     saveUserProgress(u).catch(err => console.error("autosave failed:", err));
   }, 10000);
 
-  // 切分頁時存一次
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "hidden") {
       const u = getCurrentUser();
@@ -87,13 +75,23 @@ function setupAutoSave() {
     }
   });
 
-  // 關頁前補救（不保證成功，但多一道）
   window.addEventListener("beforeunload", () => {
     const u = getCurrentUser();
     if (!u) return;
     saveUserProgress(u).catch(() => {});
   });
 }
+
+// 提供給 app.js 主動呼叫（作答後即存）
+window.__saveNow = async function() {
+  const u = getCurrentUser();
+  if (!u) return;
+  try {
+    await saveUserProgress(u);
+  } catch (e) {
+    console.error("saveNow failed:", e);
+  }
+};
 
 document.getElementById('login-btn').addEventListener('click', async () => {
   const user = document.getElementById('login-user').value.trim();
@@ -107,44 +105,23 @@ document.getElementById('login-btn').addEventListener('click', async () => {
 
   msgEl.textContent = "正在驗證中...";
 
-  const scriptUrl = "https://script.google.com/macros/s/AKfycbwTqq9cHd27xd9Lk2oZqqfcsmFR8Mdmog0wCRvljOpCFQPAERSj31tqNAZqfYc7NUX_/exec";
-
   try {
-    // 1) 先登入驗證
-    const response = await fetch(scriptUrl, {
-      method: "POST",
-      body: JSON.stringify({ action: "login", username: user, password: pass })
-    });
+    await gasPost({ action: "login", username: user, password: pass });
 
-    const result = await response.json();
-
-    if (result.status !== "success") {
-      msgEl.textContent = result.message || "登入失敗";
-      return;
-    }
-
-    // 2) 登入成功先清空
     localStorage.clear();
-
     msgEl.textContent = "登入成功，正在載入學習紀錄...";
 
-    // 3) 再載入雲端紀錄
     await loadUserProgress(user);
-
-    // 4) 寫回目前使用者
     localStorage.setItem("currentUser", user);
 
-    // 5) 啟動自動儲存
     setupAutoSave();
-
-    // 6) 啟動主程式
     document.getElementById('login-overlay').style.display = 'none';
     startApp();
 
     msgEl.textContent = "";
   } catch (err) {
     console.error(err);
-    msgEl.textContent = "連線失敗，請檢查網路或稍後再試";
+    msgEl.textContent = err.message || "連線失敗，請稍後再試";
   }
 });
 </script>
