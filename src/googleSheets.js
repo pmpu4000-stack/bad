@@ -3,6 +3,7 @@ const SHEET_API_URL = "https://script.google.com/macros/s/AKfycbwTqq9cHd27xd9Lk2
 async function postJson(payload) {
   const res = await fetch(SHEET_API_URL, {
     method: "POST",
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
   return res.json();
