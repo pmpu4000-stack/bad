@@ -7,9 +7,8 @@
   <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
-
   <script>
-    // 1. 每次開啟或刷新網頁，立即清空 LocalStorage，強制每次重新登入
+    // 1. 每次開啟或刷新網頁，預先清空 LocalStorage
     localStorage.clear();
   </script>
 
@@ -67,7 +66,8 @@
       <div class="banner" id="banner"></div>
 
       <section class="progress">
-        <h3><span>學習進度 Progress</span> <span style="display:flex;gap:14px">
+        <h3><span>學習進度 Progress</span> 
+          <span style="display:flex;gap:14px">
             <a id="placeBtn" title="重新測驗你的程度">🎯 測程度</a>
             <a id="sumBtn" title="看學習總結與答對率">📊 總結</a>
             <a id="resetBtn" title="清除所有進度">重來 reset</a>
@@ -91,7 +91,7 @@
       </p>
     </div>
 
-    <!-- ============ QUIZ SCREEN (placement / challenge) ============ -->
+    <!-- ============ QUIZ SCREEN ============ -->
     <div id="screen-quiz" hidden>
       <main class="card quizcard">
         <div class="quizhead" id="quizhead"></div>
@@ -104,7 +104,7 @@
   <script type="module">
     const scriptUrl = "https://script.google.com/macros/s/AKfycbwTqq9cHd27xd9Lk2oZqqfcsmFR8Mdmog0wCRvljOpCFQPAERSj31tqNAZqfYc7NUX_/exec";
 
-    // 登入驗證、抓取雲端紀錄並動態啟動遊戲 App
+    // 1. 登入驗證、抓取雲端紀錄並動態啟動遊戲 App
     document.getElementById('login-btn').addEventListener('click', async () => {
       const user = document.getElementById('login-user').value.trim();
       const pass = document.getElementById('login-pass').value.trim();
@@ -114,6 +114,7 @@
         msgEl.textContent = "請輸入帳號與密碼";
         return;
       }
+
       msgEl.textContent = "正在驗證並讀取雲端紀錄...";
 
       try {
@@ -127,7 +128,6 @@
         if (result.status === "success") {
           localStorage.setItem("current_user", user);
 
-          // 若有雲端歷史紀錄則寫入 LocalStorage
           if (result.records) {
             for (let key in result.records) {
               localStorage.setItem(key, result.records[key]);
@@ -136,13 +136,9 @@
 
           alert(result.records ? "登入成功！已載入雲端紀錄。" : "登入成功！開啟全新學習進度。");
 
-          // 1. 隱藏登入視窗
           document.getElementById('login-overlay').style.display = 'none';
-
-          // 2. 動態載入遊戲核心模組（此時 app.js 才會讀取剛剛存好的 LocalStorage）
           await import('./src/app.js');
 
-          // 3. 綁定上傳按鈕事件
           const uploadBtn = document.getElementById("btn-upload") || document.querySelector(".stat.upload");
           if (uploadBtn) {
             uploadBtn.style.cursor = "pointer";
@@ -157,10 +153,9 @@
       }
     });
 
-    // 上傳 LocalStorage 紀錄至 Google 試算表
+    // 2. 上傳 LocalStorage 紀錄至 Google 試算表
     async function uploadLocalStorageData() {
       const currentUser = localStorage.getItem("current_user");
-
       if (!currentUser) {
         alert("未偵測到登入帳號，請重新登入！");
         return;
@@ -176,14 +171,10 @@
         let response = await fetch(scriptUrl, {
           method: "POST",
           headers: { "Content-Type": "text/plain;charset=utf-8" },
-          body: JSON.stringify({
-            action: "saveRecord",
-            username: currentUser,
-            records: localData
-          })
+          body: JSON.stringify({ action: "saveRecord", username: currentUser, records: localData })
         });
-
         let result = await response.json();
+
         if (result.status === "success") {
           alert("上傳成功！紀錄已同步至試算表中您的專屬分頁。");
         } else {
@@ -194,6 +185,40 @@
         alert("連線失敗，請檢查網路或 Apps Script 設定。");
       }
     }
+
+    // 3. 重來 reset 密碼驗證邏輯
+    document.getElementById('resetBtn')?.addEventListener('click', async (e) => {
+      e.preventDefault();
+
+      const inputPass = prompt("⚠️ 此操作將清除所有學習進度！\n請輸入管理員密碼：");
+      if (!inputPass || inputPass.trim() === "") return;
+
+      try {
+        const response = await fetch(scriptUrl, {
+          method: "POST",
+          headers: { "Content-Type": "text/plain;charset=utf-8" },
+          body: JSON.stringify({
+            action: "reset",
+            password: inputPass.trim()
+          })
+        });
+
+        const resData = await response.json();
+
+        if (resData.status === "success") {
+          if (confirm("密碼正確！確定要清除所有進度並重來嗎？")) {
+            localStorage.clear();
+            alert("進度已重置！");
+            location.reload();
+          }
+        } else {
+          alert("❌ 密碼錯誤，無法重置進度！");
+        }
+      } catch (err) {
+        console.error("驗證失敗:", err);
+        alert("⚠️ 網路連線錯誤，無法驗證密碼。");
+      }
+    });
   </script>
 </body>
 </html>
