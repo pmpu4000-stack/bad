@@ -7,6 +7,7 @@ import * as store from "./store.js";
 import { nextWord } from "./srs.js";
 import * as ui from "./ui.js";
 import { burst } from "./confetti.js";
+import { uploadProgress, downloadProgress } from "./googleSheets.js";
 import {
   LEVELS, levelColor, levelName, sample,
   PASS_RATE, GATE_MIN_ATTEMPTS, CHALLENGE_LEN, PLACEMENT_PER_LEVEL, DAILY_GOAL,
@@ -74,6 +75,40 @@ function answer(correct) {
 }
 
 function pickLevel(n) { store.setCurrentLevel(n); refreshChrome(); newRound(); }
+
+function currentUsername() {
+  return (sessionStorage.getItem("spellAgent.username") || "").trim();
+}
+
+async function handleUpload() {
+  const username = currentUsername();
+  if (!username) { ui.note("請先登入再上傳 ☁️"); return; }
+  try {
+    const res = await uploadProgress(username, store.exportData());
+    if (res.status === "success") ui.note("✅ 進度已上傳");
+    else ui.note(`❌ 上傳失敗：${res.message || "未知錯誤"}`);
+  } catch {
+    ui.note("❌ 上傳失敗：網路或伺服器錯誤");
+  }
+}
+
+async function handleDownload() {
+  const username = currentUsername();
+  if (!username) { ui.note("請先登入再下載 📱"); return; }
+  try {
+    const res = await downloadProgress(username);
+    if (res.status !== "success" || !res.data) {
+      ui.note(`❌ 下載失敗：${res.message || "找不到進度"}`);
+      return;
+    }
+    store.importData(res.data);
+    refreshChrome();
+    newRound();
+    ui.note("✅ 進度已載入");
+  } catch {
+    ui.note("❌ 下載失敗：網路或伺服器錯誤");
+  }
+}
 
 // ---- today's training session ----
 function onSessionStart() { store.sessionStart(); refreshChrome(); }
@@ -165,6 +200,8 @@ ui.onPeek(() => { if (state.word) ui.peek(state.word); });
 ui.onReset(() => { if (confirm("確定要清除所有進度嗎？（會重新測程度）")) { store.reset(); startPlacement(); } });
 ui.onSummary(() => ui.toggleSummary(store.summary(WORDS)));
 ui.onPlace(() => startPlacement());
+document.querySelector("#s-upload").onclick = handleUpload;
+document.querySelector("#s-download").onclick = handleDownload;
 
 // ---- boot ----
 (async function boot() {

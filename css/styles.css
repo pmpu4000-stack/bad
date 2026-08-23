@@ -32,6 +32,7 @@ header{display:flex; align-items:center; gap:14px; margin-bottom:16px}
 .stat span{font-size:10px;color:var(--ink3);font-weight:700;letter-spacing:.4px;text-transform:uppercase}
 .stat.lv b{color:var(--violet)} .stat.st b{color:var(--marker);-webkit-text-stroke:.6px #E4B93B} .stat.streak b{color:var(--coral)}
 .stat.ok b{color:var(--green)}
+.stat.upload b,.stat.download b{cursor:pointer}
 
 /* ---------- category chips ---------- */
 .cats{display:flex;gap:8px;overflow-x:auto;padding:4px 2px 8px;margin-bottom:6px;scrollbar-width:none}

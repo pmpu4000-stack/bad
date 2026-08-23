@@ -61,6 +61,93 @@ since it uses ES modules. Easiest paths:
 - **GitHub Pages (https) is the most reliable**, especially on iPad.
 - The in-app **重來 reset** clears saved progress.
 
+## Google Sheets 同步（Apps Script）
+
+1. 在同一份試算表保留工作表 **「使用者清單」**（A: username, B: password）。
+2. 新增工作表 **「使用者進度」**，標題列：
+   - A: `username`
+   - B: `data`
+   - C: `timestamp`
+3. 在 Apps Script 編輯器用下列程式碼完整覆蓋：
+
+```javascript
+function doOptions(e) {
+  return ContentService.createTextOutput("");
+}
+
+function doPost(e) {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const usersSheet = ss.getSheetByName("使用者清單");
+    const progressSheet = ss.getSheetByName("使用者進度");
+    if (!usersSheet || !progressSheet) {
+      return json({ status: "error", message: "找不到必要工作表（使用者清單 / 使用者進度）" });
+    }
+
+    const params = JSON.parse(e.postData.contents || "{}");
+    const action = String(params.action || "login").trim();
+    const username = String(params.username || "").trim();
+
+    if (!username) return json({ status: "error", message: "缺少 username" });
+
+    if (action === "save") {
+      const progressData = String(params.data || "");
+      const ts = String(params.timestamp || new Date().toISOString());
+      if (!progressData) return json({ status: "error", message: "缺少 data" });
+
+      const row = findRowByUsername(progressSheet, username);
+      if (row === -1) progressSheet.appendRow([username, progressData, ts]);
+      else progressSheet.getRange(row, 2, 1, 2).setValues([[progressData, ts]]);
+
+      return json({ status: "success", message: "進度已保存" });
+    }
+
+    if (action === "load") {
+      const row = findRowByUsername(progressSheet, username);
+      if (row === -1) return json({ status: "error", message: "找不到此使用者的進度紀錄" });
+
+      const values = progressSheet.getRange(row, 1, 1, 3).getValues()[0];
+      return json({
+        status: "success",
+        data: String(values[1] || ""),
+        timestamp: String(values[2] || ""),
+        message: "進度已讀取"
+      });
+    }
+
+    // 預設與舊前端相容：未傳 action 時走登入驗證
+    const inputPass = String(params.password || "").trim();
+    const rows = usersSheet.getDataRange().getValues();
+    for (let i = 1; i < rows.length; i++) {
+      if (String(rows[i][0]).trim() === username && String(rows[i][1]).trim() === inputPass) {
+        return json({ status: "success", message: "驗證成功" });
+      }
+    }
+    return json({ status: "error", message: "帳號或密碼錯誤" });
+  } catch (error) {
+    return json({ status: "error", message: "後端錯誤：" + error.toString() });
+  }
+}
+
+function findRowByUsername(sheet, username) {
+  const values = sheet.getDataRange().getValues();
+  for (let i = 1; i < values.length; i++) {
+    if (String(values[i][0]).trim() === username) return i + 1;
+  }
+  return -1;
+}
+
+function json(obj) {
+  return ContentService.createTextOutput(JSON.stringify(obj))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+```
+
+前端 `src/googleSheets.js` 已對應同一個 Apps Script Web App URL，並採用：
+- `action: "save"`：上傳 `username/data/timestamp`
+- `action: "load"`：依 `username` 載入進度
+- 登入仍使用 `username/password` 驗證（與原本流程相容）
+
 ---
 
 ## Project structure

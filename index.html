@@ -7,11 +7,6 @@
 <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
-<script>
-  // 先在主程式載入前清空全部 localStorage
-  localStorage.clear();
-</script>
-
 <!-- 登入驗證遮罩 -->
 <div id="login-overlay" style="position:fixed; top:0; left:0; width:100%; height:100%; background:#f5f7fa; z-index:9999; display:flex; justify-content:center; align-items:center;">
     <div style="background:white; padding:30px; border-radius:12px; box-shadow:0 4px 15px rgba(0,0,0,0.1); width:320px; text-align:center;">
@@ -128,6 +123,7 @@ document.getElementById('login-btn').addEventListener('click', async () => {
         let result = await response.json();
         
         if (result.status === "success") {
+            sessionStorage.setItem("spellAgent.username", user);
             document.getElementById('login-overlay').style.display = 'none';
         } else {
             msgEl.textContent = result.message;

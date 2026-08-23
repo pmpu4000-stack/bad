@@ -34,20 +34,22 @@ function fresh() {
   };
 }
 
+function hydrate(raw) {
+  if (!raw || typeof raw !== "object") return fresh();
+  const base = fresh();
+  const merged = {
+    ...base, ...raw,
+    level: { ...base.level, ...(raw.level || {}) },
+    session: { ...base.session, ...(raw.session || {}) },
+    history: raw.history || {},
+  };
+  if (merged.session.active && merged.session.date !== todayStr()) merged.session.active = false;
+  return merged;
+}
+
 function load() {
   try {
-    const d = JSON.parse(localStorage.getItem(LS_KEY));
-    if (!d) return fresh();
-    const base = fresh();
-    const merged = {
-      ...base, ...d,
-      level: { ...base.level, ...(d.level || {}) },
-      session: { ...base.session, ...(d.session || {}) },
-      history: d.history || {},
-    };
-    // a session left open from a previous day is over
-    if (merged.session.active && merged.session.date !== todayStr()) merged.session.active = false;
-    return merged;
+    return hydrate(JSON.parse(localStorage.getItem(LS_KEY)));
   } catch {
     return fresh();
   }
@@ -98,6 +100,17 @@ export function grade(id, correct, level) {
 }
 
 export function reset() { DB = fresh(); save(); }
+
+export function exportData() {
+  return JSON.parse(JSON.stringify(DB));
+}
+
+export function importData(json) {
+  const incoming = typeof json === "string" ? JSON.parse(json) : json;
+  DB = hydrate(incoming);
+  DB.session.active = false;
+  save();
+}
 
 // ---- today's training session ----
 export function sessionStart() {
