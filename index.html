@@ -1,127 +1,149 @@
 <script>
-const GAS_URL = "https://script.google.com/macros/s/AKfycbwTqq9cHd27xd9Lk2oZqqfcsmFR8Mdmog0wCRvljOpCFQPAERSj31tqNAZqfYc7NUX_/exec";
-let appStarted = false;
-let autosaveTimer = null;
+(() => {
+  const GAS_URL = "https://script.google.com/macros/s/AKfycbwTqq9cHd27xd9Lk2oZqqfcsmFR8Mdmog0wCRvljOpCFQPAERSj31tqNAZqfYc7NUX_/exec";
+  let appStarted = false;
+  let autosaveTimer = null;
 
-function startApp() {
-  if (appStarted) return;
-  appStarted = true;
-  const moduleScript = document.createElement('script');
-  moduleScript.type = 'module';
-  moduleScript.src = 'src/app.js';
-  document.body.appendChild(moduleScript);
-}
-
-function getCurrentUser() {
-  return localStorage.getItem("currentUser") || "";
-}
-
-async function gasPost(payload) {
-  const res = await fetch(GAS_URL, {
-    method: "POST",
-    body: JSON.stringify(payload)
-  });
-  const json = await res.json();
-  if (json.status !== "success") {
-    throw new Error(json.message || "GAS request failed");
-  }
-  return json;
-}
-
-async function loadUserProgress(username) {
-  const result = await gasPost({ action: "load", username });
-  let data = result.data || {};
-
-  if (typeof data === "string") {
-    try { data = JSON.parse(data); } catch (_) { data = {}; }
+  function startApp() {
+    if (appStarted) return;
+    appStarted = true;
+    const moduleScript = document.createElement("script");
+    moduleScript.type = "module";
+    moduleScript.src = "src/app.js";
+    document.body.appendChild(moduleScript);
   }
 
-  localStorage.clear();
-  Object.entries(data).forEach(([k, v]) => {
-    localStorage.setItem(k, typeof v === "string" ? v : JSON.stringify(v));
-  });
-}
-
-async function saveUserProgress(username) {
-  if (!username) return;
-
-  const data = {};
-  for (let i = 0; i < localStorage.length; i++) {
-    const k = localStorage.key(i);
-    data[k] = localStorage.getItem(k);
+  function getCurrentUser() {
+    return localStorage.getItem("currentUser") || "";
   }
 
-  await gasPost({
-    action: "save",
-    username,
-    data
-  });
-}
-
-function setupAutoSave() {
-  if (autosaveTimer) clearInterval(autosaveTimer);
-
-  autosaveTimer = setInterval(() => {
-    const u = getCurrentUser();
-    if (!u) return;
-    saveUserProgress(u).catch(err => console.error("autosave failed:", err));
-  }, 10000);
-
-  document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState === "hidden") {
-      const u = getCurrentUser();
-      if (!u) return;
-      saveUserProgress(u).catch(err => console.error("visibility save failed:", err));
+  async function gasPost(payload) {
+    const res = await fetch(GAS_URL, {
+      method: "POST",
+      body: JSON.stringify(payload)
+    });
+    const json = await res.json();
+    if (json.status !== "success") {
+      throw new Error(json.message || "GAS request failed");
     }
-  });
-
-  window.addEventListener("beforeunload", () => {
-    const u = getCurrentUser();
-    if (!u) return;
-    saveUserProgress(u).catch(() => {});
-  });
-}
-
-// 提供給 app.js 主動呼叫（作答後即存）
-window.__saveNow = async function() {
-  const u = getCurrentUser();
-  if (!u) return;
-  try {
-    await saveUserProgress(u);
-  } catch (e) {
-    console.error("saveNow failed:", e);
-  }
-};
-
-document.getElementById('login-btn').addEventListener('click', async () => {
-  const user = document.getElementById('login-user').value.trim();
-  const pass = document.getElementById('login-pass').value.trim();
-  const msgEl = document.getElementById('login-msg');
-
-  if (!user || !pass) {
-    msgEl.textContent = "請輸入帳號與密碼";
-    return;
+    return json;
   }
 
-  msgEl.textContent = "正在驗證中...";
+  async function loadUserProgress(username) {
+    const result = await gasPost({ action: "load", username });
+    let data = result.data || {};
 
-  try {
-    await gasPost({ action: "login", username: user, password: pass });
+    if (typeof data === "string") {
+      try { data = JSON.parse(data); } catch (_) { data = {}; }
+    }
 
     localStorage.clear();
-    msgEl.textContent = "登入成功，正在載入學習紀錄...";
-
-    await loadUserProgress(user);
-    localStorage.setItem("currentUser", user);
-
-    setupAutoSave();
-    document.getElementById('login-overlay').style.display = 'none';
-    startApp();
-
-    msgEl.textContent = "";
-  } catch (err) {
-    console.error(err);
-    msgEl.textContent = err.message || "連線失敗，請稍後再試";
+    Object.entries(data).forEach(([k, v]) => {
+      localStorage.setItem(k, typeof v === "string" ? v : JSON.stringify(v));
+    });
   }
-});
+
+  async function saveUserProgress(username) {
+    if (!username) return;
+
+    const data = {};
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      data[k] = localStorage.getItem(k);
+    }
+
+    await gasPost({
+      action: "save",
+      username,
+      data
+    });
+  }
+
+  function setupAutoSave() {
+    if (autosaveTimer) clearInterval(autosaveTimer);
+
+    autosaveTimer = setInterval(() => {
+      const u = getCurrentUser();
+      if (!u) return;
+      saveUserProgress(u).catch(err => console.error("autosave failed:", err));
+    }, 10000);
+
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "hidden") {
+        const u = getCurrentUser();
+        if (!u) return;
+        saveUserProgress(u).catch(err => console.error("visibility save failed:", err));
+      }
+    });
+
+    window.addEventListener("beforeunload", () => {
+      const u = getCurrentUser();
+      if (!u) return;
+      saveUserProgress(u).catch(() => {});
+    });
+  }
+
+  // 給 app.js 呼叫：作答後即存
+  window.__saveNow = async function () {
+    const u = getCurrentUser();
+    if (!u) return;
+    try {
+      await saveUserProgress(u);
+    } catch (e) {
+      console.error("saveNow failed:", e);
+    }
+  };
+
+  function bindLogin() {
+    const loginBtn = document.getElementById("login-btn");
+    const userEl = document.getElementById("login-user");
+    const passEl = document.getElementById("login-pass");
+    const msgEl = document.getElementById("login-msg");
+    const overlay = document.getElementById("login-overlay");
+
+    // 若頁面沒有登入 UI，直接啟動 app（避免白屏）
+    if (!loginBtn || !userEl || !passEl || !msgEl || !overlay) {
+      console.warn("Login UI not found, start app directly.");
+      startApp();
+      return;
+    }
+
+    loginBtn.addEventListener("click", async () => {
+      const user = userEl.value.trim();
+      const pass = passEl.value.trim();
+
+      if (!user || !pass) {
+        msgEl.textContent = "請輸入帳號與密碼";
+        return;
+      }
+
+      msgEl.textContent = "正在驗證中...";
+
+      try {
+        await gasPost({ action: "login", username: user, password: pass });
+
+        localStorage.clear();
+        msgEl.textContent = "登入成功，正在載入學習紀錄...";
+
+        await loadUserProgress(user);
+        localStorage.setItem("currentUser", user);
+
+        setupAutoSave();
+        overlay.style.display = "none";
+        startApp();
+
+        msgEl.textContent = "";
+      } catch (err) {
+        console.error(err);
+        msgEl.textContent = err.message || "連線失敗，請稍後再試";
+      }
+    });
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", bindLogin);
+  } else {
+    bindLogin();
+  }
+})();
 </script>
