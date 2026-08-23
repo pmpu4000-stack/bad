@@ -229,34 +229,41 @@ canvas#fx{position:fixed;inset:0;pointer-events:none;z-index:50}
   .lvchip{min-width:96px} .banner .gate{flex-wrap:wrap} .banner .challenge{margin-left:0;width:100%}
 }
 /* ==================================================
-   自動跟隨系統深色模式 (僅切換色彩變數，零介面風格改動)
+   自動跟隨系統深色模式 (僅修正背景色與卡片色彩)
    ================================================== */
 @media (prefers-color-scheme: dark) {
   :root {
-    /* 主背景與卡片底色 */
-    --bg: #0F172A;            /* 網頁底色 */
-    --card: #1E293B;          /* 卡片背景 (同原本 --card) */
-    --card-bg: #1E293B;       /* 主區塊背景 */
-    --surface: #334155;       /* 輸入框與次級區塊底色 */
+    /* 1. 重新定義全域色彩變數 */
+    --bg: #0F172A;            /* 主背景色：深藍黑 */
+    --card: #1E293B;          /* 卡片背景 */
+    --card-bg: #1E293B;
+    --surface: #334155;       /* 按鈕與輸入框底色 */
     --surface-hover: #475569;
 
-    /* 邊框與分隔線 */
-    --line: #334155;          /* 邊框線條 (同原本 --line) */
+    --line: #334155;          /* 邊框顏色 */
     --border: #334155;
     --border-strong: #475569;
 
-    /* 文字色彩 (解決深色下的文字對比問題) */
-    --ink: #F8FAFC;           /* 主要文字 (白) */
-    --ink2: #CBD5E1;          /* 次要文字 (淺灰) */
-    --ink3: #94A3B8;          /* 說明/標籤文字 (中灰) */
+    --ink: #F8FAFC;           /* 主要文字：亮白 */
+    --ink2: #CBD5E1;          /* 次要文字：淺灰 */
+    --ink3: #94A3B8;          /* 說明文字：中灰 */
 
-    /* 主題色 */
-    --primary: #6366F1;       /* 紫藍色主按鈕 */
+    --primary: #6366F1;
     --primary-light: #2D2D5B;
     --primary-hover: #4F46E5;
   }
 
-  /* 登入彈窗遮罩深色色彩適應 */
+  /* 2. 強制背景套用深色 (解決背景沒改到的問題) */
+  html, body {
+    background-color: #0F172A !important;
+    color: #F8FAFC !important;
+  }
+
+  /* 3. 確保主卡片、頂部登入遮罩吃深色變數 */
+  .card, #card, .progress, section {
+    background-color: var(--card-bg) !important;
+  }
+
   #login-overlay {
     background-color: #0F172A !important;
   }
@@ -269,8 +276,5 @@ canvas#fx{position:fixed;inset:0;pointer-events:none;z-index:50}
     background-color: #334155 !important;
     color: #FFFFFF !important;
     border-color: #475569 !important;
-  }
-  #login-overlay p {
-    color: #94A3B8 !important;
   }
 }
