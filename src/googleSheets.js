@@ -1,11 +1,16 @@
-const SHEET_API_URL = "https://script.google.com/macros/s/AKfycbwTqq9cHd27xd9Lk2oZqqfcsmFR8Mdmog0wCRvljOpCFQPAERSj31tqNAZqfYc7NUX_/exec";
+function getSheetApiUrl() {
+  return window.SHEET_API_URL || "";
+}
 
 async function postJson(payload) {
+  const SHEET_API_URL = getSheetApiUrl();
+  if (!SHEET_API_URL) throw new Error("Missing Google Apps Script URL");
   const res = await fetch(SHEET_API_URL, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return res.json();
 }
 

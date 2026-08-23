@@ -98,6 +98,9 @@
   </div>
 </div>
 
+<script>
+window.SHEET_API_URL = "https://script.google.com/macros/s/AKfycbwTqq9cHd27xd9Lk2oZqqfcsmFR8Mdmog0wCRvljOpCFQPAERSj31tqNAZqfYc7NUX_/exec";
+</script>
 <script type="module" src="src/app.js"></script>
 <script>
 document.getElementById('login-btn').addEventListener('click', async () => {
@@ -109,10 +112,9 @@ document.getElementById('login-btn').addEventListener('click', async () => {
         msgEl.textContent = "請輸入帳號與密碼";
         return;
     }
-    
     msgEl.textContent = "正在驗證中...";
     
-    const scriptUrl = "https://script.google.com/macros/s/AKfycbwTqq9cHd27xd9Lk2oZqqfcsmFR8Mdmog0wCRvljOpCFQPAERSj31tqNAZqfYc7NUX_/exec"; 
+    const scriptUrl = window.SHEET_API_URL;
     
     try {
         let response = await fetch(scriptUrl, {
