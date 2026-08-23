@@ -228,3 +228,53 @@ canvas#fx{position:fixed;inset:0;pointer-events:none;z-index:50}
   .title h1{font-size:20px} .tile{width:40px;height:48px;font-size:22px}
   .lvchip{min-width:96px} .banner .gate{flex-wrap:wrap} .banner .challenge{margin-left:0;width:100%}
 }
+/* --------------------------------------------------
+ * 自動跟隨系統深色模式 (System Dark Mode)
+ * -------------------------------------------------- */
+@media (prefers-color-scheme: dark) {
+  :root {
+    /* 深色背景與卡片顏色 */
+    --bg: #0f172a;          /* 主背景 (深藍黑) */
+    --card-bg: #1e293b;     /* 卡片背景 */
+    --surface: #334155;     /* 輸入框與次級區塊背景 */
+    
+    /* 深色文字顏色 */
+    --ink: #f8fafc;         /* 主要文字 (亮白) */
+    --ink2: #cbd5e1;        /* 次要文字 */
+    --ink3: #94a3b8;        /* 說明/淡色文字 */
+    
+    /* 邊框與陰影 */
+    --border: #334155;
+    --shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+
+    /* 調整對比度高的輔助色 */
+    --primary: #6366f1;
+    --green: #10b981;
+  }
+
+  /* 確保 body 背景色同步套用 */
+  body {
+    background-color: var(--bg) !important;
+    color: var(--ink) !important;
+  }
+
+  /* 針對白底彈窗 (登入遮罩) 的深色優化 */
+  #login-overlay {
+    background-color: #0f172a !important;
+  }
+  
+  #login-overlay > div {
+    background-color: #1e293b !important;
+    color: #f8fafc !important;
+  }
+
+  #login-overlay input {
+    background-color: #334155 !important;
+    color: #ffffff !important;
+    border-color: #475569 !important;
+  }
+
+  #login-overlay p {
+    color: #94a3b8 !important;
+  }
+}
