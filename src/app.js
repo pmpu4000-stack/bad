@@ -1,3 +1,44 @@
+/* ===== Cloud Save Bridge (GAS) =====
+ * 需求：
+ * 1) index.html 已定義 window.__saveNow()
+ * 2) app.js 只要在進度變動後呼叫 queueCloudSave()
+ */
+const queueCloudSave = (() => {
+  let timer = null;
+  let inFlight = false;
+  let pending = false;
+
+  async function doSave() {
+    if (inFlight) {
+      pending = true;
+      return;
+    }
+    inFlight = true;
+    try {
+      if (typeof window.__saveNow === "function") {
+        await window.__saveNow();
+      }
+    } catch (e) {
+      console.error("[cloud-save] save failed:", e);
+    } finally {
+      inFlight = false;
+      if (pending) {
+        pending = false;
+        schedule(800);
+      }
+    }
+  }
+
+  function schedule(delay = 1000) {
+    if (timer) clearTimeout(timer);
+    timer = setTimeout(doSave, delay);
+  }
+
+  return function queueCloudSave(delay = 1000) {
+    schedule(delay);
+  };
+})();
+
 // =====================================================================
 // app.js — the controller. Boots the word bank, runs the placement test,
 // drives level-based practice, and gates progression behind challenges.
@@ -55,7 +96,7 @@ function newRound() {
 function check() {
   if (state.answered) { newRound(); return; }
   const getGuess = state.round.getGuess;
-  if (!getGuess) return;                       // pick mode answers on click
+  if (!getGuess) return; // pick mode answers on click
   const guess = getGuess();
   if (!guess) { ui.note("先拼拼看再檢查喔 ✏️"); return; }
   const correct = guess === state.word.word;
@@ -71,13 +112,36 @@ function answer(correct) {
   if (correct) burst();
   refreshChrome();
   ui.setActionNext();
+
+  // ✅ 作答後進度有變化，排程雲端存檔
+  queueCloudSave();
 }
 
-function pickLevel(n) { store.setCurrentLevel(n); refreshChrome(); newRound(); }
+function pickLevel(n) {
+  store.setCurrentLevel(n);
+  refreshChrome();
+  newRound();
+
+  // ✅ 切換目前關卡也是進度資料的一部分
+  queueCloudSave();
+}
 
 // ---- today's training session ----
-function onSessionStart() { store.sessionStart(); refreshChrome(); }
-function onSessionEnd() { showSessionSummary(store.sessionEnd()); }
+function onSessionStart() {
+  store.sessionStart();
+  refreshChrome();
+
+  // ✅ session 狀態有變化
+  queueCloudSave();
+}
+function onSessionEnd() {
+  const sum = store.sessionEnd();
+
+  // ✅ session 結束會寫統計
+  queueCloudSave();
+
+  showSessionSummary(sum);
+}
 
 function showSessionSummary(sum) {
   ui.setScreen("quiz");
@@ -109,10 +173,13 @@ async function startPlacement() {
       const ok = await ui.askPick(qs[i], { title: `程度測驗 · Level ${lv}`, color: levelColor(lv), index, total });
       if (ok) got++;
     }
-    if (got < 2) { start = lv; break; }        // struggled here → train from this level
+    if (got < 2) { start = lv; break; } // struggled here → train from this level
     if (lv === 5) start = 5;
   }
+
   store.completePlacement(start);
+  queueCloudSave(); // ✅ 測程度結果寫入後立刻存雲端
+
   const color = levelColor(start);
   ui.quizResult({
     emoji: "🎯", color,
@@ -140,6 +207,10 @@ async function startChallenge() {
     const next = store.promote();
     const promoted = next !== lv;
     burst();
+
+    // ✅ 升級/挑戰結果有變化
+    queueCloudSave();
+
     const color = levelColor(next);
     ui.quizResult({
       emoji: "🏆", color,
@@ -149,6 +220,9 @@ async function startChallenge() {
       btnLabel: "繼續 →",
     }, backToPlay);
   } else {
+    // ✅ 即使失敗也可能影響挑戰/統計
+    queueCloudSave();
+
     ui.quizResult({
       emoji: "💪", color: levelColor(lv),
       headline: "差一點！再練一下",
@@ -159,12 +233,29 @@ async function startChallenge() {
 }
 
 // ---- wiring ----
-ui.initModes(state.mode, (mode) => { state.mode = mode; state.answered = false; renderCurrent(); });
+ui.initModes(state.mode, (mode) => {
+  state.mode = mode;
+  state.answered = false;
+  renderCurrent();
+});
 ui.onCheckClick(check);
 ui.onPeek(() => { if (state.word) ui.peek(state.word); });
-ui.onReset(() => { if (confirm("確定要清除所有進度嗎？（會重新測程度）")) { store.reset(); startPlacement(); } });
+ui.onReset(() => {
+  if (confirm("確定要清除所有進度嗎？（會重新測程度）")) {
+    store.reset();
+    queueCloudSave(); // ✅ reset 後先存一次
+    startPlacement();
+  }
+});
 ui.onSummary(() => ui.toggleSummary(store.summary(WORDS)));
 ui.onPlace(() => startPlacement());
+
+// 切頁時補存一次
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "hidden") {
+    queueCloudSave(0);
+  }
+});
 
 // ---- boot ----
 (async function boot() {
