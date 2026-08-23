@@ -103,38 +103,93 @@
   </div>
 </div>
 
-<script type="module" src="src/app.js"></script>
 <script>
+let appStarted = false;
+
+function startApp() {
+    if (appStarted) return;
+    appStarted = true;
+    const moduleScript = document.createElement('script');
+    moduleScript.type = 'module';
+    moduleScript.src = 'src/app.js';
+    document.body.appendChild(moduleScript);
+}
+
+async function loadUserProgress(username) {
+    const scriptUrl = "https://script.google.com/macros/s/AKfycbwTqq9cHd27xd9Lk2oZqqfcsmFR8Mdmog0wCRvljOpCFQPAERSj31tqNAZqfYc7NUX_/exec";
+
+    const response = await fetch(scriptUrl, {
+        method: "POST",
+        body: JSON.stringify({ action: "load", username })
+    });
+
+    const result = await response.json();
+
+    if (result.status !== "success") {
+        throw new Error(result.message || "載入紀錄失敗");
+    }
+
+    let data = result.data || {};
+    if (typeof data === "string") {
+        try {
+            data = JSON.parse(data);
+        } catch (_) {
+            data = {};
+        }
+    }
+
+    // 確保清除乾淨後才載入
+    localStorage.clear();
+
+    Object.entries(data).forEach(([key, value]) => {
+        localStorage.setItem(key, typeof value === "string" ? value : JSON.stringify(value));
+    });
+}
+
 document.getElementById('login-btn').addEventListener('click', async () => {
     const user = document.getElementById('login-user').value.trim();
     const pass = document.getElementById('login-pass').value.trim();
     const msgEl = document.getElementById('login-msg');
-    
+
     if (!user || !pass) {
         msgEl.textContent = "請輸入帳號與密碼";
         return;
     }
-    
+
     msgEl.textContent = "正在驗證中...";
-    
-    const scriptUrl = "https://script.google.com/macros/s/AKfycbwTqq9cHd27xd9Lk2oZqqfcsmFR8Mdmog0wCRvljOpCFQPAERSj31tqNAZqfYc7NUX_/exec"; 
-    
+
+    const scriptUrl = "https://script.google.com/macros/s/AKfycbwTqq9cHd27xd9Lk2oZqqfcsmFR8Mdmog0wCRvljOpCFQPAERSj31tqNAZqfYc7NUX_/exec";
+
     try {
-        let response = await fetch(scriptUrl, {
+        const response = await fetch(scriptUrl, {
             method: "POST",
             body: JSON.stringify({ username: user, password: pass })
         });
-        
-        let result = await response.json();
-        
-        if (result.status === "success") {
-            document.getElementById('login-overlay').style.display = 'none';
-        } else {
-            msgEl.textContent = result.message;
+
+        const result = await response.json();
+
+        if (result.status !== "success") {
+            msgEl.textContent = result.message || "登入失敗";
+            return;
         }
+
+        // 登入成功後，先清空本機資料
+        localStorage.clear();
+
+        msgEl.textContent = "登入成功，正在載入學習紀錄...";
+
+        // 再載入帳號紀錄
+        await loadUserProgress(user);
+
+        // 可選：記錄目前登入帳號
+        localStorage.setItem("currentUser", user);
+
+        // 載入完成後才開啟主程式
+        document.getElementById('login-overlay').style.display = 'none';
+        startApp();
     } catch (err) {
         console.error(err);
-        msgEl.textContent = "連線失敗，請檢查網路或網址是否正確";
+        msgEl.textContent = "連線失敗，請檢查網路或稍後再試";
     }
 });
 </script>
