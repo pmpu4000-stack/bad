@@ -8,6 +8,11 @@
 </head>
 <body>
 
+  <script>
+    // 1. 每次開啟或刷新網頁，立即清空 LocalStorage，強制每次重新登入
+    localStorage.clear();
+  </script>
+
   <!-- 登入驗證遮罩 -->
   <div id="login-overlay" style="position:fixed; top:0; left:0; width:100%; height:100%; background:#f5f7fa; z-index:9999; display:flex; justify-content:center; align-items:center;">
     <div style="background:white; padding:30px; border-radius:12px; box-shadow:0 4px 15px rgba(0,0,0,0.1); width:320px; text-align:center;">
@@ -97,27 +102,10 @@
     </div>
   </div>
 
-  <script type="module" src="src/app.js"></script>
-
-  <script>
+  <script type="module">
     const scriptUrl = "https://script.google.com/macros/s/AKfycbwTqq9cHd27xd9Lk2oZqqfcsmFR8Mdmog0wCRvljOpCFQPAERSj31tqNAZqfYc7NUX_/exec";
 
-    // 檢查目前登入狀態與綁定事件
-    document.addEventListener("DOMContentLoaded", () => {
-      const currentUser = localStorage.getItem("current_user");
-      // 只要已經驗證成功過，就隱藏登入視窗
-      if (currentUser) {
-        document.getElementById('login-overlay').style.display = 'none';
-      }
-
-      const uploadBtn = document.getElementById("btn-upload") || document.querySelector(".stat.upload");
-      if (uploadBtn) {
-        uploadBtn.style.cursor = "pointer";
-        uploadBtn.addEventListener("click", uploadLocalStorageData);
-      }
-    });
-
-    // 登入驗證、抓取雲端紀錄並還原
+    // 登入驗證、抓取雲端紀錄並動態啟動遊戲 App
     document.getElementById('login-btn').addEventListener('click', async () => {
       const user = document.getElementById('login-user').value.trim();
       const pass = document.getElementById('login-pass').value.trim();
@@ -138,26 +126,35 @@
         let result = await response.json();
 
         if (result.status === "success") {
-          // 僅在點擊「確認登入」且驗證成功時才清空前一使用者的舊資料
-          localStorage.clear();
           localStorage.setItem("current_user", user);
 
+          // 若有雲端歷史紀錄則寫入 LocalStorage
           if (result.records) {
             for (let key in result.records) {
               localStorage.setItem(key, result.records[key]);
             }
           }
 
-          alert(result.records ? "登入成功！已載入雲端紀錄。" : "登入成功！開啓全新學習進度。");
-          
-          // 重新載入，此時 current_user 已存在，就不會再彈出登入頁面
-          location.reload();
+          alert(result.records ? "登入成功！已載入雲端紀錄。" : "登入成功！開啟全新學習進度。");
+
+          // 1. 隱藏登入視窗
+          document.getElementById('login-overlay').style.display = 'none';
+
+          // 2. 動態載入遊戲核心模組（此時 app.js 才會讀取剛剛存好的 LocalStorage）
+          await import('./src/app.js');
+
+          // 3. 綁定上傳按鈕事件
+          const uploadBtn = document.getElementById("btn-upload") || document.querySelector(".stat.upload");
+          if (uploadBtn) {
+            uploadBtn.style.cursor = "pointer";
+            uploadBtn.onclick = uploadLocalStorageData;
+          }
         } else {
           msgEl.textContent = result.message;
         }
       } catch (err) {
         console.error(err);
-        msgEl.textContent = "連線失敗，請檢查網路或網址是否正確";
+        msgEl.textContent = "連線失敗，請檢查網路或 Apps Script 設定";
       }
     });
 
@@ -166,7 +163,7 @@
       const currentUser = localStorage.getItem("current_user");
 
       if (!currentUser) {
-        alert("未偵測到登入帳號，請重新整理頁面並登入！");
+        alert("未偵測到登入帳號，請重新登入！");
         return;
       }
 
