@@ -39,25 +39,9 @@ function miniBtn(label, onClick) {
 function textInput(placeholder, onCheck) {
   const inp = document.createElement("input");
   inp.className = "spellbox";
-  inp.type = "text";
-  
-  // 標準防護屬性
-  inp.autocomplete = "off";
-  inp.autocorrect = "off";
-  inp.autocapitalize = "none";
-  inp.spellcheck = false;
-  inp.setAttribute("data-lpignore", "true");
-
-  // 物理位移法：將輸入本體移到絕對看不到的畫面外，讓手機提示框跟著飛走
-  inp.style.position = "absolute";
-  inp.style.left = "-9999px";
-  inp.style.top = "-9999px";
-  inp.style.opacity = "0";
-
+  inp.autocapitalize = "none"; inp.autocomplete = "off"; inp.autocorrect = "off"; inp.spellcheck = false;
   inp.placeholder = placeholder;
-  inp.onkeydown = (e) => {
-    if (e.key === "Enter") onCheck();
-  };
+  inp.onkeydown = (e) => { if (e.key === "Enter") onCheck(); };
   return inp;
 }
 
