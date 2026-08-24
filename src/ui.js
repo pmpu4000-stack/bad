@@ -39,9 +39,16 @@ function miniBtn(label, onClick) {
 function textInput(placeholder, onCheck) {
   const inp = document.createElement("input");
   inp.className = "spellbox";
-  inp.autocapitalize = "none"; inp.autocomplete = "off"; inp.autocorrect = "off"; inp.spellcheck = false;
+  inp.type = "text";
+  inp.autocomplete = "off";
+  inp.autocorrect = "off";
+  inp.autocapitalize = "none";
+  inp.spellcheck = false;
+  inp.setAttribute("data-lpignore", "true");
   inp.placeholder = placeholder;
-  inp.onkeydown = (e) => { if (e.key === "Enter") onCheck(); };
+  inp.onkeydown = (e) => {
+    if (e.key === "Enter") onCheck();
+  };
   return inp;
 }
 
