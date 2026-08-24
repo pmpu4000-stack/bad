@@ -37,34 +37,18 @@ function miniBtn(label, onClick) {
   return b;
 }
 function textInput(placeholder, onCheck) {
-  // 建立一個看起來像輸入框、但實際上只是普通文字區塊的容器
-  const container = document.createElement("div");
-  container.className = "spellbox custom-virtual-input";
-  container.tabIndex = 0; // 讓這個 div 可以獲得焦點
-  container.textContent = placeholder;
+  const inp = document.createElement("input");
+  inp.className = "spellbox";
+  inp.autocapitalize = "none"; inp.autocomplete = "off"; inp.autocorrect = "off"; inp.spellcheck = false;
+  inp.placeholder = placeholder;
+  inp.onkeydown = (e) => { if (e.key === "Enter") onCheck(); };
+  return inp;
+}
 
-  let currentText = "";
-
-  // 監聽鍵盤敲擊，直接在畫面上組合英文單字，完全不叫出手機原生輸入框與提示
-  window.addEventListener("keydown", (e) => {
-    // 確保只有在畫面上啟動拼字時才攔截
-    if (document.activeElement !== container) return;
-
-    if (e.key === "Enter") {
-      onCheck(currentText);
-      currentText = "";
-      container.textContent = placeholder;
-    } else if (e.key === "Backspace") {
-      currentText = currentText.slice(0, -1);
-      container.textContent = currentText || placeholder;
-    } else if (e.key.length === 1 && /^[a-zA-Z]$/.test(e.key)) {
-      if (currentText === placeholder) currentText = "";
-      currentText += e.key;
-      container.textContent = currentText;
-    }
-  });
-
-  return container;
+// ---------- screens ----------
+export function setScreen(name) {
+  el.playScreen.hidden = name !== "play";
+  el.quizScreen.hidden = name !== "quiz";
 }
 
 // ---------- navigation ----------
