@@ -7,9 +7,8 @@
   <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
-
   <script>
-    // 1. 每次開啟或刷新網頁，立即清空 LocalStorage，強制每次重新登入
+    // 1. 每次開啟或刷新網頁，傳統清空 LocalStorage，強制每次重新登入
     localStorage.clear();
   </script>
 
@@ -35,7 +34,10 @@
         <p>破解英文拼字的 5 大關卡 · 每天 10 分鐘</p>
       </div>
       <div class="stats">
-        <div class="stat upload" id="btn-upload" style="cursor:pointer;"><b id="s-upload" class="tnum">🌱</b><span>上傳紀錄</span></div>
+        <div class="stat upload" id="btn-upload" style="cursor:pointer;">
+          <b id="s-upload" class="tnum">🌱</b>
+          <span>上傳紀錄</span>
+        </div>
         <div class="stat lv"><b id="s-level" class="tnum">1</b><span>等級 LV</span></div>
         <div class="stat ok"><b id="s-correct" class="tnum">0</b><span>答對字</span></div>
         <div class="stat streak"><b id="s-streak" class="tnum">0</b><span>連勝</span></div>
@@ -67,13 +69,19 @@
       <div class="banner" id="banner"></div>
 
       <section class="progress">
-        <h3><span>學習進度 Progress</span> <span style="display:flex;gap:14px">
+        <h3>
+          <span>學習進度 Progress</span>
+          <span style="display:flex;gap:14px">
             <a id="placeBtn" title="重新測驗你的程度">🎯 測程度</a>
             <a id="sumBtn" title="看學習總結與答對率">📊 總結</a>
             <a id="resetBtn" title="清除所有進度">重來 reset</a>
           </span>
         </h3>
-        <div class="bar" title="連續答對越多次，字就越熟練"><i class="learn" id="b-learn"></i><i class="prac" id="b-prac"></i><i class="mast" id="b-mast"></i></div>
+        <div class="bar" title="連續答對越多次，字就越熟練">
+          <i class="learn" id="b-learn"></i>
+          <i class="prac" id="b-prac"></i>
+          <i class="mast" id="b-mast"></i>
+        </div>
         <div class="legend">
           <span title="答對 1 次（或最近答錯，需要再練）"><i style="background:#D9D5F2"></i>學習中 <b id="n-learn" class="tnum">0</b></span>
           <span title="連續答對 2 次"><i style="background:#B9E8D3"></i>練習中 <b id="n-prac" class="tnum">0</b></span>
@@ -113,6 +121,7 @@
         msgEl.textContent = "請輸入帳號與密碼";
         return;
       }
+
       msgEl.textContent = "正在驗證並讀取雲端紀錄...";
 
       try {
@@ -125,7 +134,7 @@
 
         if (result.status === "success") {
           localStorage.setItem("current_user", user);
-
+          
           // 若有雲端歷史紀錄則寫入 LocalStorage
           if (result.records) {
             for (let key in result.records) {
@@ -159,11 +168,14 @@
     // 上傳 LocalStorage 紀錄至 Google 試算表
     async function uploadLocalStorageData() {
       const currentUser = localStorage.getItem("current_user");
-
       if (!currentUser) {
         alert("未偵測到登入帳號，請重新登入！");
         return;
       }
+
+      // 1. 開始上傳：將嫩芽 🌱 轉為等待圖案 ⏳
+      const iconEl = document.getElementById("s-upload");
+      if (iconEl) iconEl.textContent = "⏳";
 
       const localData = {};
       for (let i = 0; i < localStorage.length; i++) {
@@ -175,14 +187,10 @@
         let response = await fetch(scriptUrl, {
           method: "POST",
           headers: { "Content-Type": "text/plain;charset=utf-8" },
-          body: JSON.stringify({
-            action: "saveRecord",
-            username: currentUser,
-            records: localData
-          })
+          body: JSON.stringify({ action: "saveRecord", username: currentUser, records: localData })
         });
-
         let result = await response.json();
+        
         if (result.status === "success") {
           alert("上傳成功！紀錄已儲存。");
         } else {
@@ -191,6 +199,9 @@
       } catch (err) {
         console.error("上傳失敗：", err);
         alert("連線失敗，請檢查網路。");
+      } finally {
+        // 2. 當彈出視窗（alert）按下確定關閉後，還原為嫩芽 🌱
+        if (iconEl) iconEl.textContent = "🌱";
       }
     }
   </script>
