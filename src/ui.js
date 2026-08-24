@@ -40,13 +40,18 @@ function textInput(placeholder, onCheck) {
   const inp = document.createElement("input");
   inp.className = "spellbox";
   inp.type = "text";
-  inp.inputMode = "search";
-  inp.enterKeyHint = "done";
-  inp.autocapitalize = "none";
+  
+  // 保留明文顯示，並精準關閉所有手機系統的智慧拼字與選字列
   inp.autocomplete = "off";
   inp.autocorrect = "off";
+  inp.autocapitalize = "none";
   inp.spellcheck = false;
   inp.setAttribute("data-lpignore", "true");
+  
+  // 核心關鍵：把 inputmode 設為 numeric 或 email/url 等不會跳出中文選字框的模式，
+  // 或者用以下屬性阻止作業系統的候選列佔位
+  inp.setAttribute("x-webkit-speech", ""); // 某些瀏覽器可選
+  
   inp.placeholder = placeholder;
   inp.onkeydown = (e) => {
     if (e.key === "Enter") onCheck();
