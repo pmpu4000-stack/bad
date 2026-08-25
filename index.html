@@ -185,16 +185,12 @@
 
       try {
         let response = await fetch(scriptUrl, {
-          method: "POST", 
-          headers: { "Content-Type": "text/plain;charset=utf-8" }, 
-          body: JSON.stringify({ 
-            action: "saveRecord", 
-            username: currentUser,
-            date: new Date().toLocaleDateString(), // ⬅️ 關鍵：帶上今天的日期，後端才能判斷並覆蓋同一天的舊紀錄
-            records: localData 
-          }) 
+          method: "POST",
+          headers: { "Content-Type": "text/plain;charset=utf-8" },
+          body: JSON.stringify({ action: "saveRecord", username: currentUser, records: localData })
         });
         let result = await response.json();
+        
         if (result.status === "success") {
           alert("上傳成功！紀錄已儲存。");
         } else {
