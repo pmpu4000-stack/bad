@@ -55,19 +55,27 @@ function load() {
     if (!rawData) return fresh();
 
     const parsedLogs = JSON.parse(rawData);
+    const base = fresh();
 
     // 兼容處理：如果舊資料不是陣列，當作舊單一物件處理
-    let currentDBData = parsedLogs;
-    if (Array.isArray(parsedLogs)) {
-      if (parsedLogs.length > 0) {
-        // 抓取陣列最後一筆（當天最新）裡面的 data
-        currentDBData = parsedLogs[parsedLogs.length - 1].data;
-      } else {
-        return fresh();
-      }
+    if (!Array.isArray(parsedLogs)) {
+      return {
+        ...base,
+        ...parsedLogs,
+        level: { ...base.level, ...(parsedLogs.level || {}) },
+        session: { ...base.session, ...(parsedLogs.session || {}) },
+        history: parsedLogs.history || {},
+      };
     }
 
-    const base = fresh();
+    if (parsedLogs.length === 0) {
+      return fresh();
+    }
+
+    // 當資料為陣列時，最後一筆通常是最新狀態
+    const latestEntry = parsedLogs[parsedLogs.length - 1];
+    const currentDBData = latestEntry.data || {};
+
     const merged = {
       ...base,
       ...currentDBData,
