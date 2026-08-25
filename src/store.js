@@ -99,37 +99,25 @@ function save() {
       logs = [];
     }
 
-    // 2. 建立今天要寫入的完整狀態包裝
+    // 2. 建立今天要寫入的資料包裝
     const newEntry = {
       date: today,
-      timestamp: timestamp, // 以這個時間戳記作為記錄與覆蓋依據
-      data: DB              // 當前整體的遊戲狀態
+      timestamp: timestamp,
+      data: DB              
     };
 
-    // 3. 檢查陣列最後一筆是否為今天（透過日期或時間戳記比對）
-    const lastIndex = logs.length - 1;
-    let isSameDay = false;
+    // 3. 嚴格檢查陣列中是否已經存在「同一個日期 (today)」的紀錄
+    const existingIndex = logs.findIndex(entry => entry.date === today);
 
-    if (lastIndex >= 0) {
-      const lastEntry = logs[lastIndex];
-      // 如果有日期欄位，直接比對日期；否則從 timestamp 解析比對
-      if (lastEntry.date) {
-        isSameDay = (lastEntry.date === today);
-      } else if (lastEntry.timestamp) {
-        const lastDateStr = new Date(lastEntry.timestamp).toISOString().split('T')[0];
-        const currentDateStr = new Date(timestamp).toISOString().split('T')[0];
-        isSameDay = (lastDateStr === currentDateStr);
-      }
-    }
-
-    // 4. 同天覆蓋，跨日新增
-    if (isSameDay) {
-      logs[lastIndex] = newEntry; // 同一天多次上傳直接覆蓋最後一筆
+    if (existingIndex !== -1) {
+      // 如果已經存在今天的紀錄：直接在原本的位置覆蓋，確保同一天絕不產生多筆
+      logs[existingIndex] = newEntry;
     } else {
-      logs.push(newEntry);        // 跨日則往下新增一筆
+      // 如果完全找不到今天的紀錄（代表跨日了）：才往下新增一筆
+      logs.push(newEntry);
     }
 
-    // 5. 寫回 localStorage
+    // 4. 寫回 localStorage
     localStorage.setItem(LS_KEY, JSON.stringify(logs));
   } catch (e) {
     console.error("儲存失敗（可能空間已滿）：", e);
