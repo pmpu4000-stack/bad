@@ -142,7 +142,12 @@
             }
           }
 
-          alert(result.records ? "登入成功！已載入雲端紀錄。" : "登入成功！開啟全新學習進度。");
+          if (result.records && result.records.length > 0) {
+            alert("登入成功！已載入雲端紀錄。");
+          } else {
+            alert("登入成功！開啟全新學習進度。");
+          }
+
 
           // 1. 隱藏登入視窗
           document.getElementById('login-overlay').style.display = 'none';
