@@ -1,153 +1,120 @@
-function doPost(e) {
-  try {
-    const ss = SpreadsheetApp.getActiveSpreadsheet();
-    const params = JSON.parse(e.postData.contents || "{}");
-    const action = params.action || "login";
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>家長登入</title>
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body { font-family: "Microsoft JhengHei", Arial, sans-serif; background: #f9f9f9; padding: 20px; }
+    h2, h3 { color: #333; }
+    table { border-collapse: collapse; width: 100%; margin-top: 20px; background: #fff; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+    th, td { border: 1px solid #ddd; padding: 10px; text-align: center; }
+    th { background: #4CAF50; color: white; }
+    tr:nth-child(even) { background: #f2f2f2; }
+    .high-score { color: green; font-weight: bold; }
+    .low-score { color: red; font-weight: bold; }
+    canvas { margin-top: 30px; }
+    #summary div { flex:1; background:#fff; padding:20px; text-align:center; box-shadow:0 2px 5px rgba(0,0,0,0.1); }
+    #summary { display:flex; gap:20px; margin-top:20px; }
+  </style>
+</head>
+<body>
+  <h2>家長登入</h2>
+  <input id="username" placeholder="家長帳號">
+  <input id="password" type="password" placeholder="家長密碼">
+  <button onclick="login()">登入</button>
 
-    // 登入驗證
-    if (action === "login") {
-      const sheet = ss.getSheetByName("使用者清單");
-      if (!sheet) throw new Error("找不到【使用者清單】工作表");
+  <div id="summary"></div>
+  <div id="result"></div>
 
-      const data = sheet.getDataRange().getValues();
-      const inputUser = String(params.username || "").trim();
-      const inputPass = String(params.password || "").trim();
+  <!-- 圖表區 -->
+  <canvas id="accuracyChart"></canvas>
+  <canvas id="wordsChart"></canvas>
+  <canvas id="statusChart"></canvas>
+  <canvas id="heatmapChart"></canvas>
+  <canvas id="streakChart"></canvas>
+  <canvas id="levelsChart"></canvas>
 
-      let isAuthenticated = false;
-      for (let i = 1; i < data.length; i++) {
-        const username = String(data[i][0] || "").trim();
-        const password = String(data[i][1] || "").trim();
-        if (username === inputUser && password === inputPass) {
-          isAuthenticated = true;
-          break;
+  <script>
+    function sum(arr){ return arr.reduce((a,b)=>a+(Number(b)||0),0); }
+
+    async function login() {
+      const username = document.getElementById('username').value;
+      const password = document.getElementById('password').value;
+      const res = await fetch('你的Apps Script網址', {
+        method: 'POST',
+        body: JSON.stringify({username, password})
+      });
+      const result = await res.json();
+      if (result.status === 'success') {
+        // 總結區塊
+        const latestRecord = result.records[result.records.length - 1];
+        const latestScore = latestRecord[2];
+        const latestAccuracy = latestRecord[7];
+        const totalWords = result.records.slice(1).reduce((sum, r) => sum + (Number(r[14]) || 0), 0);
+        document.getElementById('summary').innerHTML = `
+          <div><h3 style="color:red;">最新分數</h3><p style="font-size:24px; font-weight:bold;">${latestScore}</p></div>
+          <div><h3 style="color:blue;">最新正確率</h3><p style="font-size:24px; font-weight:bold;">${latestAccuracy}%</p></div>
+          <div><h3 style="color:green;">累積答對字數</h3><p style="font-size:24px; font-weight:bold;">${totalWords}</p></div>
+        `;
+
+        // 成績單表格
+        let html = '<h3>子女帳號：' + result.child + '</h3><table><tr>';
+        result.records[0].forEach(col => html += '<th>' + col + '</th>');
+        html += '</tr>';
+        for (let i = 1; i < result.records.length; i++) {
+          html += '<tr>';
+          result.records[i].forEach((val, idx) => {
+            if (idx === 2 || idx === 7) {
+              const cssClass = val >= 80 ? 'high-score' : 'low-score';
+              html += '<td class="' + cssClass + '">' + val + '</td>';
+            } else {
+              html += '<td>' + val + '</td>';
+            }
+          });
+          html += '</tr>';
         }
-      }
+        html += '</table>';
+        document.getElementById('result').innerHTML = html;
 
-      if (!isAuthenticated) {
-        return jsonResponse({ status: "error", message: "帳號或密碼錯誤" });
-      }
+        // 圖表資料
+        const labels = result.records.slice(1).map(r => r[0]);
+        const accuracy = result.records.slice(1).map(r => r[7]);
+        const words = result.records.slice(1).map(r => r[14]);
+        const learning = result.records.slice(1).map(r => r[15]);
+        const practicing = result.records.slice(1).map(r => r[16]);
+        const mastered = result.records.slice(1).map(r => r[17]);
+        const attempts = result.records.slice(1).map(r => r[5]);
+        const bestStreak = result.records.slice(1).map(r => r[4]);
+        const level1 = result.records.slice(1).map(r => r[9]);
+        const level2 = result.records.slice(1).map(r => r[10]);
+        const level3 = result.records.slice(1).map(r => r[11]);
+        const level4 = result.records.slice(1).map(r => r[12]);
+        const level5 = result.records.slice(1).map(r => r[13]);
 
-      let userRecords = [];
-      const userSheet = ss.getSheetByName(inputUser);
-      if (userSheet && userSheet.getLastRow() >= 2) {
-        const jsonText = String(userSheet.getRange("B2").getValue() || "").trim();
-        if (jsonText) {
-          try { userRecords = JSON.parse(jsonText); } catch (err) { userRecords = []; }
-        }
-      }
-
-      return jsonResponse({ status: "success", message: "驗證成功", records: userRecords });
-    }
-
-    // 儲存紀錄
-    if (action === "saveRecord") {
-      const username = String(params.username || "").trim();
-      const records = params.records || {};
-
-      if (!username) {
-        return jsonResponse({ status: "error", message: "未提供使用者帳號" });
-      }
-
-      let userSheet = ss.getSheetByName(username);
-      if (!userSheet) {
-        userSheet = ss.insertSheet(username);
-        userSheet.appendRow([
-          "備份時間", "完整JSON",
-          "等級", "分數", "連勝", "最佳連勝",
-          "作答次數", "答對次數", "正確率",
-          "Level1正確率/精通", "Level2正確率/精通",
-          "Level3正確率/精通", "Level4正確率/精通", "Level5正確率/精通",
-          "Distinct答對字數", "學習中", "練習中", "精中"
-        ]);
-      }
-
-      const now = new Date();
-      const todayStr = Utilities.formatDate(now, "Asia/Taipei", "yyyy-MM-dd");
-      const timestamp = Utilities.formatDate(now, "Asia/Taipei", "yyyy-MM-dd HH:mm:ss");
-      const jsonData = JSON.stringify(records);
-
-      if (jsonData.length > 50000) {
-        return jsonResponse({ status: "error", message: "資料量過大，無法儲存" });
-      }
-
-      // 解析 spellAgent.v2
-      let agentData = {};
-      try {
-        agentData = JSON.parse(records["spellAgent.v2"] || "{}");
-      } catch (err) {
-        agentData = {};
-      }
-
-      const levelInfo = agentData.level || {};
-      const lstat = agentData.lstat || {};
-
-      // 計算 distinct 答對字數 & 熟練度分布
-      let distinctCorrect = 0;
-      let learningCount = 0;
-      let practicingCount = 0;
-      let masteredCount = 0;
-
-      const stat = agentData.stat || {};
-      for (let wordId in stat) {
-        const info = stat[wordId];
-        if (info.c > 0) distinctCorrect++;
-        if (info.c === 1) learningCount++;
-        if (info.c === 2) practicingCount++;
-        if (info.c >= 3) masteredCount++;
-      }
-
-      const rowData = [
-        timestamp,
-        jsonData,
-        levelInfo.current || "",
-        agentData.points || "",
-        agentData.streak || "",
-        agentData.best || "",
-        agentData.attempts || "",
-        agentData.correct || "",
-        agentData.attempts ? (Math.round(agentData.correct / agentData.attempts * 100) + "%") : "",
-        ((lstat["1"] && lstat["1"].c) || 0) + "/" + ((lstat["1"] && lstat["1"].a) || 0),
-        ((lstat["2"] && lstat["2"].c) || 0) + "/" + ((lstat["2"] && lstat["2"].a) || 0),
-        ((lstat["3"] && lstat["3"].c) || 0) + "/" + ((lstat["3"] && lstat["3"].a) || 0),
-        ((lstat["4"] && lstat["4"].c) || 0) + "/" + ((lstat["4"] && lstat["4"].a) || 0),
-        ((lstat["5"] && lstat["5"].c) || 0) + "/" + ((lstat["5"] && lstat["5"].a) || 0),
-        distinctCorrect,
-        learningCount,
-        practicingCount,
-        masteredCount
-      ];
-
-      // 檢查第 2 列日期是否為今天
-      if (userSheet.getLastRow() >= 2) {
-        const lastDate = userSheet.getRange(2, 1).getValue();
-        const lastDateStr = Utilities.formatDate(new Date(lastDate), "Asia/Taipei", "yyyy-MM-dd");
-        if (lastDateStr === todayStr) {
-          // 覆寫今天的紀錄
-          userSheet.getRange(2, 1, 1, rowData.length).setValues([rowData]);
-        } else {
-          // 插入新紀錄
-          userSheet.insertRowBefore(2);
-          userSheet.getRange(2, 1, 1, rowData.length).setValues([rowData]);
-        }
+        // 折線圖：正確率
+        new Chart(document.getElementById('accuracyChart'), { type:'line', data:{ labels, datasets:[{ label:'正確率', data:accuracy, borderColor:'blue', fill:false }] } });
+        // 折線圖：答對字數
+        new Chart(document.getElementById('wordsChart'), { type:'line', data:{ labels, datasets:[{ label:'答對字數', data:words, borderColor:'green', fill:false }] } });
+        // 圓餅圖：狀態比例
+        new Chart(document.getElementById('statusChart'), { type:'pie', data:{ labels:['學習中','練習中','核中'], datasets:[{ data:[sum(learning), sum(practicing), sum(mastered)], backgroundColor:['yellow','blue','green'] }] } });
+        // 熱力圖：每日作答次數
+        new Chart(document.getElementById('heatmapChart'), { type:'bar', data:{ labels, datasets:[{ label:'每日作答次數', data:attempts, backgroundColor:attempts.map(val => val>=50?'darkblue':val>=20?'blue':'lightblue') }] } });
+        // 折線圖：最佳連勝
+        new Chart(document.getElementById('streakChart'), { type:'line', data:{ labels, datasets:[{ label:'最佳連勝', data:bestStreak, borderColor:'orange', backgroundColor:'rgba(255,165,0,0.2)', fill:true, tension:0.3 }] } });
+        // 堆疊柱狀圖：各關卡正確率
+        new Chart(document.getElementById('levelsChart'), { type:'bar', data:{ labels, datasets:[
+          { label:'Level1', data:level1, backgroundColor:'red' },
+          { label:'Level2', data:level2, backgroundColor:'orange' },
+          { label:'Level3', data:level3, backgroundColor:'yellow' },
+          { label:'Level4', data:level4, backgroundColor:'green' },
+          { label:'Level5', data:level5, backgroundColor:'blue' }
+        ] }, options:{ responsive:true, plugins:{ title:{ display:true, text:'各關卡正確率堆疊比較' } }, scales:{ x:{ stacked:true, title:{ display:true, text:'日期' } }, y:{ stacked:true, title:{ display:true, text:'正確率 (%)' }, max:100 } } } });
       } else {
-        // 沒有資料，直接新增
-        userSheet.insertRowBefore(2);
-        userSheet.getRange(2, 1, 1, rowData.length).setValues([rowData]);
+        alert('帳號或密碼錯誤');
       }
-
-      return jsonResponse({ status: "success", message: "紀錄已成功儲存（同一天覆寫最新紀錄）" });
     }
-
-    return jsonResponse({ status: "error", message: "未知的 action" });
-
-  } catch (err) {
-    return jsonResponse({ status: "error", message: err.toString() });
-  }
-}
-
-// JSON 回應
-function jsonResponse(obj) {
-  return ContentService
-    .createTextOutput(JSON.stringify(obj))
-    .setMimeType(ContentService.MimeType.JSON);
-}
+  </script>
+</body>
+</html>
