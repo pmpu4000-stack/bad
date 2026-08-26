@@ -1,214 +1,153 @@
-<!doctype html>
-<html lang="zh-Hant">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>拼字小特工 · Spelling Agent</title>
-  <link rel="stylesheet" href="css/styles.css">
-</head>
-<body>
-  <script>
-    // 1. 每次開啟或刷新網頁，傳統清空 LocalStorage，強制每次重新登入
-    localStorage.clear();
-  </script>
+function doPost(e) {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const params = JSON.parse(e.postData.contents || "{}");
+    const action = params.action || "login";
 
-  <!-- 登入驗證遮罩 -->
-  <div id="login-overlay" style="position:fixed; top:0; left:0; width:100%; height:100%; background:#f5f7fa; z-index:9999; display:flex; justify-content:center; align-items:center;">
-    <div style="background:white; padding:30px; border-radius:12px; box-shadow:0 4px 15px rgba(0,0,0,0.1); width:320px; text-align:center;">
-      <h2>請先登入</h2>
-      <p style="color:#666; font-size:14px; margin-bottom:20px;">請輸入您的帳號與密碼以使用拼字小特工</p>
-      <input type="text" id="login-user" placeholder="請輸入帳號" style="width:100%; padding:10px; margin-bottom:12px; border:1px solid #ddd; border-radius:6px; box-sizing:border-box;">
-      <input type="password" id="login-pass" placeholder="請輸入密碼" style="width:100%; padding:10px; margin-bottom:20px; border:1px solid #ddd; border-radius:6px; box-sizing:border-box;">
-      <button id="login-btn" style="width:100%; padding:10px; background:#4f46e5; color:white; border:none; border-radius:6px; font-weight:bold; cursor:pointer;">確認登入</button>
-      <p id="login-msg" style="color:red; font-size:13px; margin-top:10px;"></p>
-    </div>
-  </div>
+    // 登入驗證
+    if (action === "login") {
+      const sheet = ss.getSheetByName("使用者清單");
+      if (!sheet) throw new Error("找不到【使用者清單】工作表");
 
-  <canvas id="fx"></canvas>
+      const data = sheet.getDataRange().getValues();
+      const inputUser = String(params.username || "").trim();
+      const inputPass = String(params.password || "").trim();
 
-  <div class="app">
-    <header>
-      <div class="logo">拼</div>
-      <div class="title">
-        <h1>拼字小特工 <span style="font-size:13px;color:var(--ink3)">Spelling Agent</span></h1>
-        <p>破解英文拼字的 5 大關卡 · 每天 10 分鐘</p>
-      </div>
-      <div class="stats">
-        <div class="stat upload" id="btn-upload" style="cursor:pointer;">
-          <b id="s-upload" class="tnum">🌱</b>
-          <span>上傳紀錄</span>
-        </div>
-        <div class="stat lv"><b id="s-level" class="tnum">1</b><span>等級 LV</span></div>
-        <div class="stat ok"><b id="s-correct" class="tnum">0</b><span>答對字</span></div>
-        <div class="stat streak"><b id="s-streak" class="tnum">0</b><span>連勝</span></div>
-        <div class="stat rate"><b id="s-rate" class="tnum">0%</b><span>答對率</span></div>
-      </div>
-    </header>
-
-    <!-- ============ PLAY SCREEN ============ -->
-    <div id="screen-play">
-      <div class="session" id="session"></div>
-      <nav class="levelbar" id="levelbar" aria-label="選擇關卡"></nav>
-      <div class="modes" id="modes" role="tablist" aria-label="練習模式"></div>
-
-      <main class="card" id="card">
-        <div class="prompt-row">
-          <span class="catlabel" id="catlabel">關卡</span>
-          <span class="modehint" id="modehint"></span>
-        </div>
-        <div class="zh" id="zh"></div>
-        <div class="sent" id="sent"></div>
-        <div class="stage" id="stage"></div>
-        <div class="feedback" id="feedback"></div>
-        <div class="actions">
-          <button class="btn ghost" id="peekBtn" title="偷看一下答案">👀 偷看</button>
-          <button class="btn primary" id="checkBtn">檢查 Check</button>
-        </div>
-      </main>
-
-      <div class="banner" id="banner"></div>
-
-      <section class="progress">
-        <h3>
-          <span>學習進度 Progress</span>
-          <span style="display:flex;gap:14px">
-            <a id="placeBtn" title="重新測驗你的程度">🎯 測程度</a>
-            <a id="sumBtn" title="看學習總結與答對率">📊 總結</a>
-            <a id="resetBtn" title="清除所有進度">重來 reset</a>
-          </span>
-        </h3>
-        <div class="bar" title="連續答對越多次，字就越熟練">
-          <i class="learn" id="b-learn"></i>
-          <i class="prac" id="b-prac"></i>
-          <i class="mast" id="b-mast"></i>
-        </div>
-        <div class="legend">
-          <span title="答對 1 次（或最近答錯，需要再練）"><i style="background:#D9D5F2"></i>學習中 <b id="n-learn" class="tnum">0</b></span>
-          <span title="連續答對 2 次"><i style="background:#B9E8D3"></i>練習中 <b id="n-prac" class="tnum">0</b></span>
-          <span title="連續答對 3 次，獲得 ⭐"><i style="background:var(--green)"></i>精通 <b id="n-mast" class="tnum">0</b></span>
-          <span style="margin-left:auto;color:var(--ink3)">共 <b id="n-total" class="tnum">0</b> 字</span>
-        </div>
-        <p class="defs">熟練度定義：<b>學習中</b>＝答對 1 次 · <b>練習中</b>＝連續答對 2 次 · <b>精通</b>＝連續答對 3 次（答錯會退回「學習中」）</p>
-      </section>
-
-      <section class="summary" id="summary" hidden></section>
-
-      <p class="foot">
-        🔊 需要開啟聲音才能聽發音。進度儲存要按上傳紀錄。<br>
-      </p>
-    </div>
-
-    <!-- ============ QUIZ SCREEN (placement / challenge) ============ -->
-    <div id="screen-quiz" hidden>
-      <main class="card quizcard">
-        <div class="quizhead" id="quizhead"></div>
-        <div class="quizprog"><i id="quizprog-bar"></i></div>
-        <div class="stage" id="quizstage"></div>
-      </main>
-    </div>
-  </div>
-
-  <script type="module">
-    const scriptUrl = "https://script.google.com/macros/s/AKfycbwTqq9cHd27xd9Lk2oZqqfcsmFR8Mdmog0wCRvljOpCFQPAERSj31tqNAZqfYc7NUX_/exec";
-
-    // 登入驗證、抓取雲端紀錄並動態啟動遊戲 App
-    document.getElementById('login-btn').addEventListener('click', async () => {
-      const user = document.getElementById('login-user').value.trim();
-      const pass = document.getElementById('login-pass').value.trim();
-      const msgEl = document.getElementById('login-msg');
-
-      if (!user || !pass) {
-        msgEl.textContent = "請輸入帳號與密碼";
-        return;
-      }
-
-      msgEl.textContent = "正在驗證並讀取雲端紀錄...";
-
-      try {
-        let response = await fetch(scriptUrl, {
-          method: "POST",
-          headers: { "Content-Type": "text/plain;charset=utf-8" },
-          body: JSON.stringify({ action: "login", username: user, password: pass })
-        });
-        let result = await response.json();
-
-        if (result.status === "success") {
-          localStorage.setItem("current_user", user);
-          
-          // 若有雲端歷史紀錄則寫入 LocalStorage
-          if (result.records) {
-            for (let key in result.records) {
-              localStorage.setItem(key, result.records[key]);
-            }
-          }
-
-          if (result.records && result.records.length > 0) {
-            alert("登入成功！已載入雲端紀錄。");
-          } else {
-            alert("登入成功！開啟全新學習進度。");
-          }
-
-
-          // 1. 隱藏登入視窗
-          document.getElementById('login-overlay').style.display = 'none';
-
-          // 2. 動態載入遊戲核心模組（此時 app.js 才會讀取剛剛存好的 LocalStorage）
-          await import('./src/app.js');
-
-          // 3. 綁定上傳按鈕事件
-          const uploadBtn = document.getElementById("btn-upload") || document.querySelector(".stat.upload");
-          if (uploadBtn) {
-            uploadBtn.style.cursor = "pointer";
-            uploadBtn.onclick = uploadLocalStorageData;
-          }
-        } else {
-          msgEl.textContent = result.message;
+      let isAuthenticated = false;
+      for (let i = 1; i < data.length; i++) {
+        const username = String(data[i][0] || "").trim();
+        const password = String(data[i][1] || "").trim();
+        if (username === inputUser && password === inputPass) {
+          isAuthenticated = true;
+          break;
         }
-      } catch (err) {
-        console.error(err);
-        msgEl.textContent = "連線失敗，請檢查網路。";
-      }
-    });
-
-    // 上傳 LocalStorage 紀錄至 Google 試算表
-    async function uploadLocalStorageData() {
-      const currentUser = localStorage.getItem("current_user");
-      if (!currentUser) {
-        alert("未偵測到登入帳號，請重新登入！");
-        return;
       }
 
-      // 1. 開始上傳：將嫩芽 🌱 轉為等待圖案 ⏳
-      const iconEl = document.getElementById("s-upload");
-      if (iconEl) iconEl.textContent = "⏳";
-
-      const localData = {};
-      for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i);
-        localData[key] = localStorage.getItem(key);
+      if (!isAuthenticated) {
+        return jsonResponse({ status: "error", message: "帳號或密碼錯誤" });
       }
 
-      try {
-        let response = await fetch(scriptUrl, {
-          method: "POST",
-          headers: { "Content-Type": "text/plain;charset=utf-8" },
-          body: JSON.stringify({ action: "saveRecord", username: currentUser, records: localData })
-        });
-        let result = await response.json();
-        
-        if (result.status === "success") {
-          alert("上傳成功！紀錄已儲存。");
-        } else {
-          alert("儲存失敗：" + result.message);
+      let userRecords = [];
+      const userSheet = ss.getSheetByName(inputUser);
+      if (userSheet && userSheet.getLastRow() >= 2) {
+        const jsonText = String(userSheet.getRange("B2").getValue() || "").trim();
+        if (jsonText) {
+          try { userRecords = JSON.parse(jsonText); } catch (err) { userRecords = []; }
         }
-      } catch (err) {
-        console.error("上傳失敗：", err);
-        alert("連線失敗，請檢查網路。");
-      } finally {
-        // 2. 當彈出視窗（alert）按下確定關閉後，還原為嫩芽 🌱
-        if (iconEl) iconEl.textContent = "🌱";
       }
+
+      return jsonResponse({ status: "success", message: "驗證成功", records: userRecords });
     }
-  </script>
-</body>
-</html>
+
+    // 儲存紀錄
+    if (action === "saveRecord") {
+      const username = String(params.username || "").trim();
+      const records = params.records || {};
+
+      if (!username) {
+        return jsonResponse({ status: "error", message: "未提供使用者帳號" });
+      }
+
+      let userSheet = ss.getSheetByName(username);
+      if (!userSheet) {
+        userSheet = ss.insertSheet(username);
+        userSheet.appendRow([
+          "備份時間", "完整JSON",
+          "等級", "分數", "連勝", "最佳連勝",
+          "作答次數", "答對次數", "正確率",
+          "Level1正確率/精通", "Level2正確率/精通",
+          "Level3正確率/精通", "Level4正確率/精通", "Level5正確率/精通",
+          "Distinct答對字數", "學習中", "練習中", "精中"
+        ]);
+      }
+
+      const now = new Date();
+      const todayStr = Utilities.formatDate(now, "Asia/Taipei", "yyyy-MM-dd");
+      const timestamp = Utilities.formatDate(now, "Asia/Taipei", "yyyy-MM-dd HH:mm:ss");
+      const jsonData = JSON.stringify(records);
+
+      if (jsonData.length > 50000) {
+        return jsonResponse({ status: "error", message: "資料量過大，無法儲存" });
+      }
+
+      // 解析 spellAgent.v2
+      let agentData = {};
+      try {
+        agentData = JSON.parse(records["spellAgent.v2"] || "{}");
+      } catch (err) {
+        agentData = {};
+      }
+
+      const levelInfo = agentData.level || {};
+      const lstat = agentData.lstat || {};
+
+      // 計算 distinct 答對字數 & 熟練度分布
+      let distinctCorrect = 0;
+      let learningCount = 0;
+      let practicingCount = 0;
+      let masteredCount = 0;
+
+      const stat = agentData.stat || {};
+      for (let wordId in stat) {
+        const info = stat[wordId];
+        if (info.c > 0) distinctCorrect++;
+        if (info.c === 1) learningCount++;
+        if (info.c === 2) practicingCount++;
+        if (info.c >= 3) masteredCount++;
+      }
+
+      const rowData = [
+        timestamp,
+        jsonData,
+        levelInfo.current || "",
+        agentData.points || "",
+        agentData.streak || "",
+        agentData.best || "",
+        agentData.attempts || "",
+        agentData.correct || "",
+        agentData.attempts ? (Math.round(agentData.correct / agentData.attempts * 100) + "%") : "",
+        ((lstat["1"] && lstat["1"].c) || 0) + "/" + ((lstat["1"] && lstat["1"].a) || 0),
+        ((lstat["2"] && lstat["2"].c) || 0) + "/" + ((lstat["2"] && lstat["2"].a) || 0),
+        ((lstat["3"] && lstat["3"].c) || 0) + "/" + ((lstat["3"] && lstat["3"].a) || 0),
+        ((lstat["4"] && lstat["4"].c) || 0) + "/" + ((lstat["4"] && lstat["4"].a) || 0),
+        ((lstat["5"] && lstat["5"].c) || 0) + "/" + ((lstat["5"] && lstat["5"].a) || 0),
+        distinctCorrect,
+        learningCount,
+        practicingCount,
+        masteredCount
+      ];
+
+      // 檢查第 2 列日期是否為今天
+      if (userSheet.getLastRow() >= 2) {
+        const lastDate = userSheet.getRange(2, 1).getValue();
+        const lastDateStr = Utilities.formatDate(new Date(lastDate), "Asia/Taipei", "yyyy-MM-dd");
+        if (lastDateStr === todayStr) {
+          // 覆寫今天的紀錄
+          userSheet.getRange(2, 1, 1, rowData.length).setValues([rowData]);
+        } else {
+          // 插入新紀錄
+          userSheet.insertRowBefore(2);
+          userSheet.getRange(2, 1, 1, rowData.length).setValues([rowData]);
+        }
+      } else {
+        // 沒有資料，直接新增
+        userSheet.insertRowBefore(2);
+        userSheet.getRange(2, 1, 1, rowData.length).setValues([rowData]);
+      }
+
+      return jsonResponse({ status: "success", message: "紀錄已成功儲存（同一天覆寫最新紀錄）" });
+    }
+
+    return jsonResponse({ status: "error", message: "未知的 action" });
+
+  } catch (err) {
+    return jsonResponse({ status: "error", message: err.toString() });
+  }
+}
+
+// JSON 回應
+function jsonResponse(obj) {
+  return ContentService
+    .createTextOutput(JSON.stringify(obj))
+    .setMimeType(ContentService.MimeType.JSON);
+}
