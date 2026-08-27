@@ -1,118 +1,207 @@
-<!DOCTYPE html>
-<html>
+<!doctype html>
+<html lang="zh-Hant">
 <head>
-  <meta charset="UTF-8">
-  <title>家長登入</title>
-  <!-- Chart.js -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <style>
-    body { font-family: "Microsoft JhengHei", Arial, sans-serif; background: #f9f9f9; padding: 20px; }
-    h2, h3 { color: #333; }
-    table { border-collapse: collapse; width: 100%; margin-top: 20px; background: #fff; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
-    th, td { border: 1px solid #ddd; padding: 10px; text-align: center; }
-    th { background: #4CAF50; color: white; }
-    tr:nth-child(even) { background: #f2f2f2; }
-    .high-score { color: green; font-weight: bold; }
-    .low-score { color: red; font-weight: bold; }
-    canvas { margin-top: 30px; }
-    #summary div { flex:1; background:#fff; padding:20px; text-align:center; box-shadow:0 2px 5px rgba(0,0,0,0.1); }
-    #summary { display:flex; gap:20px; margin-top:20px; }
-  </style>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>拼字小特工 · Spelling Agent</title>
+  <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
-  <h2>家長登入</h2>
-  <input id="username" placeholder="家長帳號">
-  <input id="password" type="password" placeholder="家長密碼">
-  <button onclick="login()">登入</button>
-
-  <div id="summary"></div>
-  <div id="result"></div>
-
-  <!-- 圖表區 -->
-  <canvas id="accuracyChart"></canvas>
-  <canvas id="wordsChart"></canvas>
-  <canvas id="statusChart"></canvas>
-  <canvas id="heatmapChart"></canvas>
-  <canvas id="streakChart"></canvas>
-  <canvas id="levelsChart"></canvas>
-
   <script>
-    function sum(arr){ return arr.reduce((a,b)=>a+(Number(b)||0),0); }
+    // 1. 每次開啟或刷新網頁，傳統清空 LocalStorage，強制每次重新登入
+    localStorage.clear();
+  </script>
 
-    async function login() {
-      const username = document.getElementById('username').value;
-      const password = document.getElementById('password').value;
-      const res = await fetch('你的Apps Script網址', {
-        method: 'POST',
-        body: JSON.stringify({username, password})
-      });
-      const result = await res.json();
-      if (result.status === 'success') {
-        // 總結區塊
-        const latestRecord = result.records[result.records.length - 1];
-        const latestScore = latestRecord[2];
-        const latestAccuracy = latestRecord[7];
-        const totalWords = result.records.slice(1).reduce((sum, r) => sum + (Number(r[14]) || 0), 0);
-        document.getElementById('summary').innerHTML = `
-          <div><h3 style="color:red;">最新分數</h3><p style="font-size:24px; font-weight:bold;">${latestScore}</p></div>
-          <div><h3 style="color:blue;">最新正確率</h3><p style="font-size:24px; font-weight:bold;">${latestAccuracy}%</p></div>
-          <div><h3 style="color:green;">累積答對字數</h3><p style="font-size:24px; font-weight:bold;">${totalWords}</p></div>
-        `;
+  <!-- 登入驗證遮罩 -->
+  <div id="login-overlay" style="position:fixed; top:0; left:0; width:100%; height:100%; background:#f5f7fa; z-index:9999; display:flex; justify-content:center; align-items:center;">
+    <div style="background:white; padding:30px; border-radius:12px; box-shadow:0 4px 15px rgba(0,0,0,0.1); width:320px; text-align:center;">
+      <h2>請先登入</h2>
+      <p style="color:#666; font-size:14px; margin-bottom:20px;">請輸入您的帳號與密碼以使用拼字小特工</p>
+      <input type="text" id="login-user" placeholder="請輸入帳號" style="width:100%; padding:10px; margin-bottom:12px; border:1px solid #ddd; border-radius:6px; box-sizing:border-box;">
+      <input type="password" id="login-pass" placeholder="請輸入密碼" style="width:100%; padding:10px; margin-bottom:20px; border:1px solid #ddd; border-radius:6px; box-sizing:border-box;">
+      <button id="login-btn" style="width:100%; padding:10px; background:#4f46e5; color:white; border:none; border-radius:6px; font-weight:bold; cursor:pointer;">確認登入</button>
+      <p id="login-msg" style="color:red; font-size:13px; margin-top:10px;"></p>
+    </div>
+  </div>
 
-        // 成績單表格
-        let html = '<h3>子女帳號：' + result.child + '</h3><table><tr>';
-        result.records[0].forEach(col => html += '<th>' + col + '</th>');
-        html += '</tr>';
-        for (let i = 1; i < result.records.length; i++) {
-          html += '<tr>';
-          result.records[i].forEach((val, idx) => {
-            if (idx === 2 || idx === 7) {
-              const cssClass = val >= 80 ? 'high-score' : 'low-score';
-              html += '<td class="' + cssClass + '">' + val + '</td>';
-            } else {
-              html += '<td>' + val + '</td>';
+  <canvas id="fx"></canvas>
+
+  <div class="app">
+    <header>
+      <div class="logo">拼</div>
+      <div class="title">
+        <h1>拼字小特工 <span style="font-size:13px;color:var(--ink3)">Spelling Agent</span></h1>
+        <p>破解英文拼字的 5 大關卡 · 每天 10 分鐘</p>
+      </div>
+      <div class="stats">
+        <div class="stat upload" id="btn-upload" style="cursor:pointer;">
+          <b id="s-upload" class="tnum">🌱</b>
+          <span>上傳紀錄</span>
+        </div>
+        <div class="stat lv"><b id="s-level" class="tnum">1</b><span>等級 LV</span></div>
+        <div class="stat ok"><b id="s-correct" class="tnum">0</b><span>答對字</span></div>
+        <div class="stat streak"><b id="s-streak" class="tnum">0</b><span>連勝</span></div>
+        <div class="stat rate"><b id="s-rate" class="tnum">0%</b><span>答對率</span></div>
+      </div>
+    </header>
+
+    <!-- ============ PLAY SCREEN ============ -->
+    <div id="screen-play">
+      <div class="session" id="session"></div>
+      <nav class="levelbar" id="levelbar" aria-label="選擇關卡"></nav>
+      <div class="modes" id="modes" role="tablist" aria-label="練習模式"></div>
+
+      <main class="card" id="card">
+        <div class="prompt-row">
+          <span class="catlabel" id="catlabel">關卡</span>
+          <span class="modehint" id="modehint"></span>
+        </div>
+        <div class="zh" id="zh"></div>
+        <div class="sent" id="sent"></div>
+        <div class="stage" id="stage"></div>
+        <div class="feedback" id="feedback"></div>
+        <div class="actions">
+          <button class="btn ghost" id="peekBtn" title="偷看一下答案">👀 偷看</button>
+          <button class="btn primary" id="checkBtn">檢查 Check</button>
+        </div>
+      </main>
+
+      <div class="banner" id="banner"></div>
+
+      <section class="progress">
+        <h3>
+          <span>學習進度 Progress</span>
+          <span style="display:flex;gap:14px">
+            <a id="placeBtn" title="重新測驗你的程度">🎯 測程度</a>
+            <a id="sumBtn" title="看學習總結與答對率">📊 總結</a>
+            <a id="resetBtn" title="清除所有進度">重來 reset</a>
+          </span>
+        </h3>
+        <div class="bar" title="連續答對越多次，字就越熟練">
+          <i class="learn" id="b-learn"></i>
+          <i class="prac" id="b-prac"></i>
+          <i class="mast" id="b-mast"></i>
+        </div>
+        <div class="legend">
+          <span title="答對 1 次（或最近答錯，需要再練）"><i style="background:#D9D5F2"></i>學習中 <b id="n-learn" class="tnum">0</b></span>
+          <span title="連續答對 2 次"><i style="background:#B9E8D3"></i>練習中 <b id="n-prac" class="tnum">0</b></span>
+          <span title="連續答對 3 次，獲得 ⭐"><i style="background:var(--green)"></i>精通 <b id="n-mast" class="tnum">0</b></span>
+          <span style="margin-left:auto;color:var(--ink3)">共 <b id="n-total" class="tnum">0</b> 字</span>
+        </div>
+        <p class="defs">熟練度定義：<b>學習中</b>＝答對 1 次 · <b>練習中</b>＝連續答對 2 次 · <b>精通</b>＝連續答對 3 次（答錯會退回「學習中」）</p>
+      </section>
+
+      <section class="summary" id="summary" hidden></section>
+
+      <p class="foot">
+        🔊 需要開啟聲音才能聽發音。進度儲存要按上傳紀錄。<br>
+      </p>
+    </div>
+
+    <!-- ============ QUIZ SCREEN (placement / challenge) ============ -->
+    <div id="screen-quiz" hidden>
+      <main class="card quizcard">
+        <div class="quizhead" id="quizhead"></div>
+        <div class="quizprog"><i id="quizprog-bar"></i></div>
+        <div class="stage" id="quizstage"></div>
+      </main>
+    </div>
+  </div>
+
+  <script type="module">
+    const scriptUrl = "https://script.google.com/macros/s/AKfycbwTqq9cHd27xd9Lk2oZqqfcsmFR8Mdmog0wCRvljOpCFQPAERSj31tqNAZqfYc7NUX_/exec";
+
+    // 登入驗證、抓取雲端紀錄並動態啟動遊戲 App
+    document.getElementById('login-btn').addEventListener('click', async () => {
+      const user = document.getElementById('login-user').value.trim();
+      const pass = document.getElementById('login-pass').value.trim();
+      const msgEl = document.getElementById('login-msg');
+
+      if (!user || !pass) {
+        msgEl.textContent = "請輸入帳號與密碼";
+        return;
+      }
+
+      msgEl.textContent = "正在驗證並讀取雲端紀錄...";
+
+      try {
+        let response = await fetch(scriptUrl, {
+          method: "POST",
+          headers: { "Content-Type": "text/plain;charset=utf-8" },
+          body: JSON.stringify({ action: "login", username: user, password: pass })
+        });
+        let result = await response.json();
+
+        if (result.status === "success") {
+          localStorage.setItem("current_user", user);
+          
+          // 若有雲端歷史紀錄則寫入 LocalStorage
+          if (result.records) {
+            for (let key in result.records) {
+              localStorage.setItem(key, result.records[key]);
             }
-          });
-          html += '</tr>';
+          }
+
+          alert(result.records ? "登入成功！已載入雲端紀錄。" : "登入成功！開啟全新學習進度。");
+
+          // 1. 隱藏登入視窗
+          document.getElementById('login-overlay').style.display = 'none';
+
+          // 2. 動態載入遊戲核心模組（此時 app.js 才會讀取剛剛存好的 LocalStorage）
+          await import('./src/app.js');
+
+          // 3. 綁定上傳按鈕事件
+          const uploadBtn = document.getElementById("btn-upload") || document.querySelector(".stat.upload");
+          if (uploadBtn) {
+            uploadBtn.style.cursor = "pointer";
+            uploadBtn.onclick = uploadLocalStorageData;
+          }
+        } else {
+          msgEl.textContent = result.message;
         }
-        html += '</table>';
-        document.getElementById('result').innerHTML = html;
+      } catch (err) {
+        console.error(err);
+        msgEl.textContent = "連線失敗，請檢查網路。";
+      }
+    });
 
-        // 圖表資料
-        const labels = result.records.slice(1).map(r => r[0]);
-        const accuracy = result.records.slice(1).map(r => r[7]);
-        const words = result.records.slice(1).map(r => r[14]);
-        const learning = result.records.slice(1).map(r => r[15]);
-        const practicing = result.records.slice(1).map(r => r[16]);
-        const mastered = result.records.slice(1).map(r => r[17]);
-        const attempts = result.records.slice(1).map(r => r[5]);
-        const bestStreak = result.records.slice(1).map(r => r[4]);
-        const level1 = result.records.slice(1).map(r => r[9]);
-        const level2 = result.records.slice(1).map(r => r[10]);
-        const level3 = result.records.slice(1).map(r => r[11]);
-        const level4 = result.records.slice(1).map(r => r[12]);
-        const level5 = result.records.slice(1).map(r => r[13]);
+    // 上傳 LocalStorage 紀錄至 Google 試算表
+    async function uploadLocalStorageData() {
+      const currentUser = localStorage.getItem("current_user");
+      if (!currentUser) {
+        alert("未偵測到登入帳號，請重新登入！");
+        return;
+      }
 
-        // 折線圖：正確率
-        new Chart(document.getElementById('accuracyChart'), { type:'line', data:{ labels, datasets:[{ label:'正確率', data:accuracy, borderColor:'blue', fill:false }] } });
-        // 折線圖：答對字數
-        new Chart(document.getElementById('wordsChart'), { type:'line', data:{ labels, datasets:[{ label:'答對字數', data:words, borderColor:'green', fill:false }] } });
-        // 圓餅圖：狀態比例
-        new Chart(document.getElementById('statusChart'), { type:'pie', data:{ labels:['學習中','練習中','核中'], datasets:[{ data:[sum(learning), sum(practicing), sum(mastered)], backgroundColor:['yellow','blue','green'] }] } });
-        // 熱力圖：每日作答次數
-        new Chart(document.getElementById('heatmapChart'), { type:'bar', data:{ labels, datasets:[{ label:'每日作答次數', data:attempts, backgroundColor:attempts.map(val => val>=50?'darkblue':val>=20?'blue':'lightblue') }] } });
-        // 折線圖：最佳連勝
-        new Chart(document.getElementById('streakChart'), { type:'line', data:{ labels, datasets:[{ label:'最佳連勝', data:bestStreak, borderColor:'orange', backgroundColor:'rgba(255,165,0,0.2)', fill:true, tension:0.3 }] } });
-        // 堆疊柱狀圖：各關卡正確率
-        new Chart(document.getElementById('levelsChart'), { type:'bar', data:{ labels, datasets:[
-          { label:'Level1', data:level1, backgroundColor:'red' },
-          { label:'Level2', data:level2, backgroundColor:'orange' },
-          { label:'Level3', data:level3, backgroundColor:'yellow' },
-          { label:'Level4', data:level4, backgroundColor:'green' },
-          { label:'Level5', data:level5, backgroundColor:'blue' }
-        ] }, options:{ responsive:true, plugins:{ title:{ display:true, text:'各關卡正確率堆疊比較' } }, scales:{ x:{ stacked:true, title:{ display:true, text:'日期' } }, y:{ stacked:true, title:{ display:true, text:'正確率 (%)' }, max:100 } } } });
-      } else {
-        alert('帳號或密碼錯誤');
+      // 1. 開始上傳：將嫩芽 🌱 轉為等待圖案 ⏳
+      const iconEl = document.getElementById("s-upload");
+      if (iconEl) iconEl.textContent = "⏳";
+
+      const localData = {};
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        localData[key] = localStorage.getItem(key);
+      }
+
+      try {
+        let response = await fetch(scriptUrl, {
+          method: "POST",
+          headers: { "Content-Type": "text/plain;charset=utf-8" },
+          body: JSON.stringify({ action: "saveRecord", username: currentUser, records: localData })
+        });
+        let result = await response.json();
+        
+        if (result.status === "success") {
+          alert("上傳成功！紀錄已儲存。");
+        } else {
+          alert("儲存失敗：" + result.message);
+        }
+      } catch (err) {
+        console.error("上傳失敗：", err);
+        alert("連線失敗，請檢查網路。");
+      } finally {
+        // 2. 當彈出視窗（alert）按下確定關閉後，還原為嫩芽 🌱
+        if (iconEl) iconEl.textContent = "🌱";
       }
     }
   </script>
