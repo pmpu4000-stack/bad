@@ -347,6 +347,21 @@ export function makeDefaultMask(word) {
   return m;
 }
 
+const THEMES = [
+  { id: "food", name: "🍏 飲食料理", reg: /(eat|drink|food|cook|fruit|vegetable|meat|bread|rice|soup|tea|coffee|cake|meal|breakfast|lunch|dinner|snack|sweet|taste|sugar|salt|milk|juice|egg|butter|cheese|beef|pork|chicken|fish|noodle|apple|banana|orange|grape|restaurant|cafeteria|kitchen|cabbage|carrot|cookie|hungry|thirsty|delicious|pizza|hamburger|sandwich|beer|wine|bottle|bowl|cup|plate|spoon|fork|knife|chopsticks|吃|喝|飲|食|煮|烹|果|菜|肉|麵|飯|湯|茶|啡|糕|餐|餐點|早餐|午餐|晚餐|甜|糖|鹽|乳|奶|蛋|牛|豬|雞|魚|香蕉|蘋果|橘|葡萄|餅乾|餓|渴|好吃|美味|碗|盤|杯|匙|叉|筷)/i },
+  { id: "animal", name: "🐶 動物生態", reg: /(animal|pet|dog|cat|bird|fish|lion|tiger|bear|monkey|elephant|horse|cow|pig|sheep|duck|chicken|mouse|rabbit|snake|frog|insect|bug|bee|ant|butterfly|fly|spider|whale|dolphin|shark|zoo|forest|nature|tree|flower|grass|plant|leaf|mountain|river|sea|ocean|lake|beach|sky|sun|moon|star|cloud|rain|snow|wind|storm|weather|動|寵|狗|貓|鳥|魚|獅|虎|熊|猴|象|馬|牛|豬|羊|鴨|雞|鼠|兔|蛇|蛙|蟲|蜂|蟻|蝶|蜘蛛|鯨|豚|鯊|動物園|森林|自然|樹|花|草|植|葉|山|河|海|洋|湖|海灘|天|日|月|星|雲|雨|雪|風|暴|天氣)/i },
+  { id: "school", name: "🏫 校園學習", reg: /(school|class|student|teacher|study|learn|book|read|write|pen|pencil|eraser|ruler|paper|notebook|desk|chair|board|blackboard|test|exam|grade|question|answer|lesson|homework|math|english|chinese|history|science|music|art|sport|library|campus|playground|chalk|diploma|college|university|學|校|班|生|師|讀|寫|書|筆|擦|尺|紙|本|桌|椅|板|黑板|考|測|分|題|答|課|作業|功課|數|英|國文|史|理|音|藝|體|圖書館|校園|操場|粉筆|大學)/i },
+  { id: "home", name: "🏠 家庭居住", reg: /(home|house|family|parent|father|mother|dad|mom|brother|sister|son|daughter|grandpa|grandma|baby|child|kid|room|bedroom|bathroom|living room|door|window|wall|floor|bed|sofa|table|light|lamp|clock|phone|telephone|tv|television|clean|wash|brush|sleep|wake|live|stay|家|屋|室|房|父|母|爸|媽|兄|弟|姊|妹|兒|女|祖|嬰|孩|童|客廳|臥室|浴室|門|窗|牆|地|床|沙發|燈|鐘|電|話|視|清|洗|刷|睡|醒|住|留)/i },
+  { id: "body", name: "🏃 人體健康", reg: /(body|head|face|eye|ear|nose|mouth|lip|tooth|teeth|tongue|hair|neck|arm|hand|finger|leg|foot|feet|knee|toe|heart|blood|bone|skin|health|healthy|sick|ill|cold|fever|cough|pain|hurt|hospital|doctor|nurse|medicine|dentist|ambulance|tired|rest|體|頭|臉|眼|耳|鼻|口|嘴|唇|齒|牙|舌|髮|頸|手|指|臂|腿|腳|足|膝|趾|心|血|骨|皮|膚|健|康|病|痛|燒|咳|醫|院|護士|藥|牙醫|救護車|累|休息)/i },
+  { id: "traffic", name: "🚗 交通旅遊", reg: /(car|bus|train|plane|airplane|ship|boat|bicycle|bike|motorcycle|taxi|mrt|metro|station|airport|stop|street|road|way|drive|ride|fly|travel|trip|visit|hotel|ticket|map|city|town|country|walk|cross|turn|park|bridge|交|通|車|公車|火車|機|飛機|船|自行車|腳踏車|機車|計程車|捷運|站|場|機|路|街|道|駕|騎|飛|旅|遊|訪|飯店|旅館|票|地圖|市|鎮|走|行|過|轉|園|橋)/i },
+  { id: "time", name: "⏰ 時間季節", reg: /(time|clock|watch|hour|minute|second|day|week|month|year|today|tomorrow|yesterday|morning|noon|afternoon|evening|night|midnight|spring|summer|autumn|fall|winter|season|monday|tuesday|wednesday|thursday|friday|saturday|sunday|january|february|march|april|may|june|july|august|september|october|november|december|early|late|now|then|always|never|often|sometimes|時|鐘|表|小時|分|秒|日|天|週|星期|月|年|今|明|昨|早|晨|午|下午|晚|夜|春|夏|秋|冬|季|初|晚|現|常|總|不曾|有時)/i },
+  { id: "job", name: "💼 職業人物", reg: /(person|people|man|woman|men|women|boy|girl|friend|guy|adult|gentleman|lady|job|work|worker|boss|doctor|nurse|teacher|student|driver|farmer|cook|singer|actor|actress|artist|musician|policeman|police|officer|clerk|waiter|waitress|king|queen|president|leader|人|者|員|男|女|童|友|成人|紳士|女士|工作|工|老|醫|護|師|生|司機|農|廚|歌|演|藝|樂|警|官|店員|服務生|王|后|總統|領袖)/i },
+  { id: "sport", name: "🎨 休閒運動", reg: /(sport|game|play|ball|baseball|basketball|football|soccer|tennis|badminton|golf|swim|run|jog|jump|dance|sing|song|music|guitar|piano|movie|film|camp|party|holiday|vacation|toy|doll|fun|hobby|exercise|win|lose|運|動|賽|戲|玩|球|棒球|籃球|足球|網球|羽毛球|高爾夫|游|跑|慢跑|跳|舞|唱|歌|樂|吉他|鋼琴|電影|影|營|派對|假|節|玩具|洋娃娃|趣味|嗜好|練|勝|贏|輸)/i },
+  { id: "feeling", name: "🌟 情感狀態", reg: /(happy|sad|angry|afraid|scared|brave|surprised|proud|nervous|bored|boring|tired|excited|exciting|interested|interesting|love|like|hate|care|worry|feel|feeling|good|bad|great|wonderful|beautiful|nice|fine|cool|warm|sweet|kind|polite|honest|rich|poor|busy|free|hard|easy|new|old|young|tall|short|big|small|快|樂|悲|傷|怒|氣|怕|恐|勇|敢|驚|傲|緊|張|悶|聊|累|疲|興奮|趣|愛|喜|恨|關心|擔|憂|覺|感|好|壞|美|棒|優|妙|善|和|禮|誠|富|窮|忙|閒|難|易|新|舊|老|幼|少|高|矮|大|小)/i },
+];
+
+const LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
+
 export function showParentModal({
   words,
   currentConfig,
@@ -370,9 +385,15 @@ export function showParentModal({
   const wrongSet = new Set(everWrongIds);
   const unmastSet = new Set(unmasteredIds);
 
-  let searchQuery = "";
-  let levelFilter = 0; // 0 = all
+  // States
+  let navDim = "all"; // "all" | "theme" | "az" | "level"
+  let selectedTheme = null;
+  let selectedLetter = null;
+  let selectedLevel = 0; // 0 = all
   let presetFilter = null; // null | "wrong" | "unmastered"
+  let searchQuery = "";
+  let currentPage = 1;
+  let pageSize = 50; // 50 | 100 | Infinity
 
   const overlay = document.createElement("div");
   overlay.className = "parent-modal-overlay";
@@ -389,33 +410,72 @@ export function showParentModal({
       </div>
       <div class="parent-body">
         <!-- Tab 1: Bank Area -->
-        <div id="pBankArea">
+        <div id="pBankArea" style="display:flex; flex-direction:column; gap:8px; flex:1; min-height:0;">
+          <!-- Search Row -->
           <div class="parent-search-row">
             <input type="text" class="parent-search-input" id="pSearch" placeholder="🔍 搜尋英文單字或中文意思（例如 apple、學校）...">
+            <button class="search-clear-btn" id="pSearchClear" style="display:none" title="清除">✕</button>
           </div>
-          <div class="parent-presets" style="margin-top: 8px;">
-            <span style="font-size:12px;color:var(--ink3);font-weight:700">智慧篩選：</span>
-            <button class="preset-btn" id="preWrong">⚠️ 曾拼錯字 (${everWrongIds.length})</button>
-            <button class="preset-btn" id="preUnmastered">🌱 未精通單字</button>
+
+          <!-- Fast Packs & Presets -->
+          <div class="parent-presets">
+            <span style="font-size:12px;color:var(--ink3);font-weight:700">快速任務：</span>
+            <button class="preset-btn highlight" id="preSmart15" title="優先挑選孩子常錯與未熟練字">🎯 今日智能推薦 15 字</button>
+            <button class="preset-btn" id="preAllWrong" title="一鍵挑選所有曾拼錯過的易錯字">⚠️ 全選曾錯字 (${everWrongIds.length})</button>
             <button class="preset-btn" id="preRand10">🎲 隨機抽 10 字</button>
             <button class="preset-btn" id="preRand20">🎲 隨機抽 20 字</button>
           </div>
-          <div class="parent-filter-row" style="margin-top: 8px;">
-            <button class="parent-lv-chip active" data-lv="0">全部關卡</button>
-            <button class="parent-lv-chip" data-lv="1">Level 1</button>
-            <button class="parent-lv-chip" data-lv="2">Level 2</button>
-            <button class="parent-lv-chip" data-lv="3">Level 3</button>
-            <button class="parent-lv-chip" data-lv="4">Level 4</button>
-            <button class="parent-lv-chip" data-lv="5">Level 5</button>
+
+          <!-- Dimension Switcher Bar -->
+          <div class="parent-dims">
+            <button class="dim-btn active" data-dim="all">全部單字</button>
+            <button class="dim-btn" data-dim="theme">🏷️ 依主題分類</button>
+            <button class="dim-btn" data-dim="az">🔤 依 A–Z 字母</button>
+            <button class="dim-btn" data-dim="level">🎯 依關卡難度</button>
           </div>
-          <div class="parent-list-tools" style="margin-top: 8px;">
-            <span>符合篩選：<b id="pFilteredCount" style="color:var(--ink)">0</b> 字</span>
+
+          <!-- Dynamic Sub-bars -->
+          <div id="subThemeBar" class="parent-theme-bar" style="display:none;"></div>
+          <div id="subAzBar" class="parent-az-bar" style="display:none;"></div>
+          <div id="subLevelBar" class="parent-filter-row" style="display:none;">
+            <button class="parent-lv-chip active" data-lv="0">全部關卡 (2055)</button>
+            <button class="parent-lv-chip" data-lv="1">Level 1 · 國一基礎</button>
+            <button class="parent-lv-chip" data-lv="2">Level 2 · 國一進階</button>
+            <button class="parent-lv-chip" data-lv="3">Level 3 · 國二核心</button>
+            <button class="parent-lv-chip" data-lv="4">Level 4 · 國二進階</button>
+            <button class="parent-lv-chip" data-lv="5">Level 5 · 國三挑戰</button>
+          </div>
+
+          <!-- Tools & Batch Actions -->
+          <div class="parent-list-tools">
+            <span id="pFilterStatus" style="color:var(--ink2)">符合條件：<b id="pFilteredCount" style="color:var(--violet-d)">0</b> 字</span>
             <div>
-              <button class="parent-tool-btn" id="pSelectAll">全選此篩選</button>
-              <button class="parent-tool-btn" id="pDeselectAll">取消勾選此篩選</button>
+              <button class="parent-tool-btn" id="pSelectPage">全選本頁</button>
+              <button class="parent-tool-btn" id="pDeselectPage">取消本頁</button>
+              <button class="parent-tool-btn" id="pSelectAll">全選此條件</button>
             </div>
           </div>
-          <div class="parent-word-list" id="pWordList" style="margin-top: 4px;"></div>
+
+          <!-- Word List -->
+          <div class="parent-word-list" id="pWordList"></div>
+
+          <!-- Pagination Bar -->
+          <div class="parent-pagination" id="pPagination">
+            <div class="page-btn-group">
+              <button class="page-btn" id="pgFirst" title="第一頁">⏮</button>
+              <button class="page-btn" id="pgPrev" title="上一頁">◀ 上一頁</button>
+              <span id="pgInfo" style="margin: 0 4px; color:var(--ink2);">第 1 / 1 頁</span>
+              <button class="page-btn" id="pgNext" title="下一頁">下一頁 ▶</button>
+              <button class="page-btn" id="pgLast" title="最末頁">⏭</button>
+            </div>
+            <div>
+              <select class="page-select" id="pgSizeSelect">
+                <option value="50">每頁 50 字</option>
+                <option value="100">每頁 100 字</option>
+                <option value="all">全部展開</option>
+              </select>
+            </div>
+          </div>
         </div>
 
         <!-- Tab 2: Custom Area -->
@@ -466,8 +526,60 @@ export function showParentModal({
   const pFilteredCount = $p("#pFilteredCount");
   const pGoalInput = $p("#pGoalInput");
   const pSearch = $p("#pSearch");
+  const pSearchClear = $p("#pSearchClear");
   const pCustomInput = $p("#pCustomInput");
   const pParseMsg = $p("#pParseMsg");
+  const subThemeBar = $p("#subThemeBar");
+  const subAzBar = $p("#subAzBar");
+  const subLevelBar = $p("#subLevelBar");
+
+  // Render Sub Theme Chips
+  THEMES.forEach((thm) => {
+    const btn = document.createElement("button");
+    btn.className = "theme-chip";
+    btn.dataset.tid = thm.id;
+    btn.textContent = thm.name;
+    btn.onclick = () => {
+      if (selectedTheme === thm.id) {
+        selectedTheme = null;
+        btn.classList.remove("active");
+      } else {
+        selectedTheme = thm.id;
+        subThemeBar.querySelectorAll(".theme-chip").forEach((c) => c.classList.remove("active"));
+        btn.classList.add("active");
+      }
+      currentPage = 1;
+      renderWordList();
+    };
+    subThemeBar.append(btn);
+  });
+
+  // Render Sub A-Z Chips
+  const allAzChip = document.createElement("button");
+  allAzChip.className = "az-chip active";
+  allAzChip.textContent = "All";
+  allAzChip.onclick = () => {
+    selectedLetter = null;
+    subAzBar.querySelectorAll(".az-chip").forEach((c) => c.classList.remove("active"));
+    allAzChip.classList.add("active");
+    currentPage = 1;
+    renderWordList();
+  };
+  subAzBar.append(allAzChip);
+
+  LETTERS.forEach((lt) => {
+    const btn = document.createElement("button");
+    btn.className = "az-chip";
+    btn.textContent = lt;
+    btn.onclick = () => {
+      selectedLetter = lt;
+      subAzBar.querySelectorAll(".az-chip").forEach((c) => c.classList.remove("active"));
+      btn.classList.add("active");
+      currentPage = 1;
+      renderWordList();
+    };
+    subAzBar.append(btn);
+  });
 
   function getTotalCount() {
     return selectedIds.size + customWordsMap.size;
@@ -486,7 +598,6 @@ export function showParentModal({
       return;
     }
 
-    // Render bank words
     selectedIds.forEach((id) => {
       const w = wordsMap.get(id);
       if (!w) return;
@@ -501,7 +612,6 @@ export function showParentModal({
       pChipsBar.append(chip);
     });
 
-    // Render custom words
     customWordsMap.forEach((cw, key) => {
       const chip = document.createElement("span");
       chip.className = "parent-chip";
@@ -517,8 +627,19 @@ export function showParentModal({
 
   function getFilteredWords() {
     const q = searchQuery.trim().toLowerCase();
+    const thmObj = selectedTheme ? THEMES.find((t) => t.id === selectedTheme) : null;
+
     return words.filter((w) => {
-      if (levelFilter > 0 && w.level !== levelFilter) return false;
+      if (navDim === "level" || selectedLevel > 0) {
+        if (selectedLevel > 0 && w.level !== selectedLevel) return false;
+      }
+      if (navDim === "az" && selectedLetter) {
+        if (!w.word.toUpperCase().startsWith(selectedLetter)) return false;
+      }
+      if (navDim === "theme" && thmObj) {
+        const text = (w.word + " " + (w.zh || "")).toLowerCase();
+        if (!thmObj.reg.test(text)) return false;
+      }
       if (presetFilter === "wrong" && !wrongSet.has(w.id)) return false;
       if (presetFilter === "unmastered" && !unmastSet.has(w.id)) return false;
       if (q) {
@@ -536,29 +657,59 @@ export function showParentModal({
     });
   }
 
+  let lastFiltered = [];
+
   function renderWordList() {
     const filtered = getFilteredWords();
+    lastFiltered = filtered;
     pFilteredCount.textContent = filtered.length;
     pWordList.innerHTML = "";
 
+    const totalPages = pageSize === Infinity ? 1 : Math.ceil(filtered.length / pageSize) || 1;
+    if (currentPage > totalPages) currentPage = totalPages;
+    if (currentPage < 1) currentPage = 1;
+
+    const startIdx = pageSize === Infinity ? 0 : (currentPage - 1) * pageSize;
+    const endIdx = pageSize === Infinity ? filtered.length : Math.min(startIdx + pageSize, filtered.length);
+    const pageSlice = filtered.slice(startIdx, endIdx);
+
+    // Update Pagination UI
+    const pgFirst = $p("#pgFirst");
+    const pgPrev = $p("#pgPrev");
+    const pgNext = $p("#pgNext");
+    const pgLast = $p("#pgLast");
+    const pgInfo = $p("#pgInfo");
+
     if (filtered.length === 0) {
+      pgInfo.textContent = "第 0 / 0 頁";
+      pgFirst.disabled = true; pgPrev.disabled = true;
+      pgNext.disabled = true; pgLast.disabled = true;
       pWordList.innerHTML = `<div style="padding:24px;text-align:center;color:var(--ink3);font-size:13px">沒有符合條件的單字</div>`;
       return;
     }
 
-    const MAX_SHOW = 150;
-    const slice = filtered.slice(0, MAX_SHOW);
+    pgInfo.textContent = `第 ${currentPage} / ${totalPages} 頁 (本頁 ${pageSlice.length} 字 / 共 ${filtered.length} 字)`;
+    pgFirst.disabled = currentPage === 1;
+    pgPrev.disabled = currentPage === 1;
+    pgNext.disabled = currentPage === totalPages;
+    pgLast.disabled = currentPage === totalPages;
 
-    slice.forEach((w) => {
+    pageSlice.forEach((w) => {
       const item = document.createElement("div");
       item.className = "parent-word-item";
       const isChecked = selectedIds.has(w.id);
       const phon = w.ph ? ` [${w.ph}]` : "";
       const isWrong = wrongSet.has(w.id);
-      const badge = isWrong ? `<span class="p-w-badge" style="color:var(--coral)" title="曾拼錯">❌</span>` : "";
+      const isMast = !unmastSet.has(w.id);
+      const badge = isWrong
+        ? `<span class="p-w-badge" style="color:var(--coral)" title="曾拼錯">❌ 曾錯</span>`
+        : isMast
+        ? `<span class="p-w-badge" style="color:var(--green)" title="已精通">⭐ 精通</span>`
+        : "";
 
       item.innerHTML = `
         <input type="checkbox" data-id="${w.id}" ${isChecked ? "checked" : ""}>
+        <button class="p-w-speak" title="試聽發音">🔊</button>
         <span class="p-w-text">${w.word}</span>
         <span class="p-w-zh">${w.zh || ""}${phon}</span>
         ${badge}
@@ -566,6 +717,13 @@ export function showParentModal({
       `;
 
       const cb = item.querySelector("input[type='checkbox']");
+      const speakBtn = item.querySelector(".p-w-speak");
+
+      speakBtn.onclick = (e) => {
+        e.stopPropagation();
+        say(w.word);
+      };
+
       const toggle = () => {
         if (selectedIds.has(w.id)) {
           selectedIds.delete(w.id);
@@ -578,63 +736,113 @@ export function showParentModal({
       };
 
       item.onclick = (e) => {
-        if (e.target !== cb) toggle();
+        if (e.target !== cb && e.target !== speakBtn) toggle();
       };
       cb.onchange = () => toggle();
 
       pWordList.append(item);
     });
 
-    if (filtered.length > MAX_SHOW) {
-      const more = document.createElement("div");
-      more.style.padding = "10px";
-      more.style.textAlign = "center";
-      more.style.color = "var(--ink3)";
-      more.style.fontSize = "12px";
-      more.textContent = `... 還有 ${filtered.length - MAX_SHOW} 個單字，請輸入關鍵字進一步篩選。`;
-      pWordList.append(more);
-    }
+    pWordList.scrollTop = 0;
   }
 
-  // --- Search & Filter Events ---
-  pSearch.oninput = (e) => {
-    searchQuery = e.target.value;
+  // --- Pagination Button Events ---
+  $p("#pgFirst").onclick = () => { currentPage = 1; renderWordList(); };
+  $p("#pgPrev").onclick = () => { if (currentPage > 1) { currentPage--; renderWordList(); } };
+  $p("#pgNext").onclick = () => {
+    const totalPages = pageSize === Infinity ? 1 : Math.ceil(lastFiltered.length / pageSize);
+    if (currentPage < totalPages) { currentPage++; renderWordList(); }
+  };
+  $p("#pgLast").onclick = () => {
+    currentPage = pageSize === Infinity ? 1 : Math.ceil(lastFiltered.length / pageSize);
     renderWordList();
   };
 
-  overlay.querySelectorAll(".parent-lv-chip").forEach((chip) => {
-    chip.onclick = () => {
-      overlay.querySelectorAll(".parent-lv-chip").forEach((c) => c.classList.remove("active"));
-      chip.classList.add("active");
-      levelFilter = +chip.dataset.lv;
+  $p("#pgSizeSelect").onchange = (e) => {
+    const val = e.target.value;
+    pageSize = val === "all" ? Infinity : parseInt(val);
+    currentPage = 1;
+    renderWordList();
+  };
+
+  // --- Dimension Switcher Events ---
+  overlay.querySelectorAll(".dim-btn").forEach((btn) => {
+    btn.onclick = () => {
+      overlay.querySelectorAll(".dim-btn").forEach((b) => b.classList.remove("active"));
+      btn.classList.add("active");
+      navDim = btn.dataset.dim;
+
+      subThemeBar.style.display = navDim === "theme" ? "flex" : "none";
+      subAzBar.style.display = navDim === "az" ? "flex" : "none";
+      subLevelBar.style.display = navDim === "level" ? "flex" : "none";
+
+      if (navDim === "all") {
+        selectedTheme = null;
+        selectedLetter = null;
+        selectedLevel = 0;
+      }
+      currentPage = 1;
       renderWordList();
     };
   });
 
-  const preWrong = $p("#preWrong");
-  const preUnmastered = $p("#preUnmastered");
-  preWrong.onclick = () => {
-    if (presetFilter === "wrong") {
-      presetFilter = null;
-      preWrong.classList.remove("active");
-    } else {
-      presetFilter = "wrong";
-      preWrong.classList.add("active");
-      preUnmastered.classList.remove("active");
-    }
+  // --- Level filter inside Level Bar ---
+  subLevelBar.querySelectorAll(".parent-lv-chip").forEach((chip) => {
+    chip.onclick = () => {
+      subLevelBar.querySelectorAll(".parent-lv-chip").forEach((c) => c.classList.remove("active"));
+      chip.classList.add("active");
+      selectedLevel = +chip.dataset.lv;
+      currentPage = 1;
+      renderWordList();
+    };
+  });
+
+  // --- Search & Clear ---
+  pSearch.oninput = (e) => {
+    searchQuery = e.target.value;
+    pSearchClear.style.display = searchQuery ? "block" : "none";
+    currentPage = 1;
     renderWordList();
   };
-
-  preUnmastered.onclick = () => {
-    if (presetFilter === "unmastered") {
-      presetFilter = null;
-      preUnmastered.classList.remove("active");
-    } else {
-      presetFilter = "unmastered";
-      preUnmastered.classList.add("active");
-      preWrong.classList.remove("active");
-    }
+  pSearchClear.onclick = () => {
+    pSearch.value = "";
+    searchQuery = "";
+    pSearchClear.style.display = "none";
+    currentPage = 1;
     renderWordList();
+    pSearch.focus();
+  };
+
+  // --- Quick Mission Packs ---
+  $p("#preSmart15").onclick = () => {
+    const wrongCandidates = words.filter((w) => wrongSet.has(w.id));
+    const unmastCandidates = words.filter((w) => unmastSet.has(w.id) && !wrongSet.has(w.id));
+    const otherCandidates = words.filter((w) => !wrongSet.has(w.id) && !unmastSet.has(w.id));
+
+    const picks = [];
+    shuffle(wrongCandidates).slice(0, 8).forEach((w) => picks.push(w.id));
+    shuffle(unmastCandidates).slice(0, 15 - picks.length).forEach((w) => picks.push(w.id));
+    if (picks.length < 15) {
+      shuffle(otherCandidates).slice(0, 15 - picks.length).forEach((w) => picks.push(w.id));
+    }
+
+    picks.forEach((id) => selectedIds.add(id));
+    updateSelectedChips();
+    updateListCheckboxes();
+    pGoalInput.value = Math.max(15, getTotalCount());
+    alert(`🎉 已為您智能推薦 ${picks.length} 個重點單字（包含曾拼錯字與未精通單字）！`);
+  };
+
+  $p("#preAllWrong").onclick = () => {
+    if (everWrongIds.length === 0) {
+      alert("目前沒有拼錯紀錄，太棒了！");
+      return;
+    }
+    everWrongIds.forEach((id) => selectedIds.add(id));
+    updateSelectedChips();
+    updateListCheckboxes();
+    pGoalInput.value = Math.max(everWrongIds.length, getTotalCount());
+    alert(`已將全部 ${everWrongIds.length} 個曾拼錯的單字加入練習清單！`);
   };
 
   $p("#preRand10").onclick = () => {
@@ -653,16 +861,27 @@ export function showParentModal({
     updateListCheckboxes();
   };
 
-  $p("#pSelectAll").onclick = () => {
-    const list = getFilteredWords();
-    list.forEach((w) => selectedIds.add(w.id));
+  // --- Batch selection tools ---
+  $p("#pSelectPage").onclick = () => {
+    const startIdx = pageSize === Infinity ? 0 : (currentPage - 1) * pageSize;
+    const endIdx = pageSize === Infinity ? lastFiltered.length : Math.min(startIdx + pageSize, lastFiltered.length);
+    const slice = lastFiltered.slice(startIdx, endIdx);
+    slice.forEach((w) => selectedIds.add(w.id));
     updateSelectedChips();
     updateListCheckboxes();
   };
 
-  $p("#pDeselectAll").onclick = () => {
-    const list = getFilteredWords();
-    list.forEach((w) => selectedIds.delete(w.id));
+  $p("#pDeselectPage").onclick = () => {
+    const startIdx = pageSize === Infinity ? 0 : (currentPage - 1) * pageSize;
+    const endIdx = pageSize === Infinity ? lastFiltered.length : Math.min(startIdx + pageSize, lastFiltered.length);
+    const slice = lastFiltered.slice(startIdx, endIdx);
+    slice.forEach((w) => selectedIds.delete(w.id));
+    updateSelectedChips();
+    updateListCheckboxes();
+  };
+
+  $p("#pSelectAll").onclick = () => {
+    lastFiltered.forEach((w) => selectedIds.add(w.id));
     updateSelectedChips();
     updateListCheckboxes();
   };
@@ -687,7 +906,7 @@ export function showParentModal({
   tabBank.onclick = () => {
     tabBank.classList.add("active");
     tabCustom.classList.remove("active");
-    pBankArea.style.display = "";
+    pBankArea.style.display = "flex";
     pCustomArea.style.display = "none";
   };
 
