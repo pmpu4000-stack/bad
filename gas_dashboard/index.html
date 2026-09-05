@@ -1,0 +1,2822 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <title>學生學習歷程儀表板（含單日差分與圖表）</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    :root {
+      --primary: #2563eb;
+      --primary-hover: #1d4ed8;
+      --primary-light: #eff6ff;
+      --success: #16a34a;
+      --success-bg: #dcfce7;
+      --danger: #dc2626;
+      --danger-bg: #fee2e2;
+      --warning: #d97706;
+      --warning-bg: #fef3c7;
+      --bg: #f1f5f9;
+      --card: #ffffff;
+      --border: #e2e8f0;
+      --text: #0f172a;
+      --text-muted: #64748b;
+      --input-bg: #ffffff;
+      --table-header-bg: #f8fafc;
+      --table-hover-bg: #f8fafc;
+      --chart-container-bg: #f8fafc;
+      --chart-title-color: #334155;
+      --diff-zero-bg: #f1f5f9;
+      --kpi1: #2563eb; --kpi2: #16a34a; --kpi3: #d97706; --kpi4: #7c3aed;
+    }
+    [data-theme="dark"] {
+      --bg: #0f172a; --card: #1e293b; --border: #334155;
+      --text: #f8fafc; --text-muted: #94a3b8; --input-bg: #0f172a;
+      --primary: #3b82f6; --primary-hover: #60a5fa; --primary-light: #1e3a8a;
+      --table-header-bg: #0f172a; --table-hover-bg: #1e293b;
+      --chart-container-bg: #0f172a; --chart-title-color: #cbd5e1;
+      --success: #22c55e; --success-bg: rgba(34,197,94,0.2);
+      --danger: #ef4444; --danger-bg: rgba(239,68,68,0.2);
+      --warning: #f59e0b; --warning-bg: rgba(245,158,11,0.2);
+      --diff-zero-bg: #334155;
+      --kpi1: #60a5fa; --kpi2: #4ade80; --kpi3: #fbbf24; --kpi4: #a78bfa;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Microsoft JhengHei", sans-serif;
+      margin: 0; padding: 24px 16px;
+      background-color: var(--bg); color: var(--text);
+      line-height: 1.5;
+      transition: background-color 0.3s ease, color 0.3s ease;
+    }
+    .container { max-width: 1280px; margin: 0 auto; }
+
+     
+    .card {
+      background: var(--card);
+      border-radius: 14px; padding: 22px 24px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+      border: 1px solid var(--border); margin-bottom: 20px;
+      transition: background-color 0.3s ease, border-color 0.3s ease;
+    }
+    .header-title {
+      display: flex; flex-wrap: wrap;
+      justify-content: space-between; align-items: center;
+      gap: 12px; margin-bottom: 20px;
+    }
+    h2 {
+      margin: 0; font-size: 1.35rem; font-weight: 700;
+      color: var(--text); display: flex; align-items: center; gap: 8px;
+    }
+
+     
+    @keyframes fadeSlideIn {
+      from { opacity: 0; transform: translateY(12px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .fade-in { animation: fadeSlideIn 0.35s ease both; }
+
+     
+    .controls-grid { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; }
+    .input-field { display: flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 500; color: var(--text-muted); }
+    input[type="text"], input[type="password"], input[type="date"], select {
+      padding: 8px 12px; border: 1.5px solid var(--border);
+      border-radius: 8px; font-size: 14px; color: var(--text); outline: none;
+      transition: all 0.2s ease; background: var(--input-bg);
+      min-height: 40px;  
+    }
+    input:focus, select:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(37,99,235,0.15);
+    }
+
+     
+    button {
+      padding: 8px 16px; min-height: 40px;  
+      background-color: var(--primary); color: #fff;
+      border: none; border-radius: 8px; font-size: 14px; font-weight: 600;
+      cursor: pointer; display: inline-flex; align-items: center; gap: 6px;
+      transition: all 0.18s ease; user-select: none;
+    }
+    button:hover:not(:disabled) { background-color: var(--primary-hover); transform: translateY(-1px); }
+    button:active:not(:disabled) { transform: scale(0.97); }
+    button:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+    .btn-secondary {
+      background-color: var(--card); color: var(--text); border: 1.5px solid var(--border);
+    }
+    .btn-secondary:hover:not(:disabled) { background-color: var(--table-hover-bg); }
+    .btn-sm { padding: 5px 10px; font-size: 12.5px; border-radius: 6px; min-height: 34px; }
+
+     
+    .quick-dates { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+    .quick-dates .btn-sm.active {
+      background-color: var(--primary); color: #fff; border-color: var(--primary);
+    }
+
+     
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 14px; margin-bottom: 20px;
+    }
+    .kpi-card {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 12px; padding: 16px 16px 16px 20px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.02);
+      transition: background-color 0.3s, border-color 0.3s, transform 0.15s;
+      border-left: 4px solid var(--kpi1);
+      position: relative; cursor: default;
+    }
+    .kpi-card:nth-child(1) { border-left-color: var(--kpi1); }
+    .kpi-card:nth-child(2) { border-left-color: var(--kpi2); }
+    .kpi-card:nth-child(3) { border-left-color: var(--kpi3); }
+    .kpi-card:nth-child(4) { border-left-color: var(--kpi4); }
+    .kpi-card:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(0,0,0,0.08); }
+
+     
+    .kpi-card[data-tip]:hover::after {
+      content: attr(data-tip);
+      position: absolute; bottom: calc(100% + 8px); left: 50%;
+      transform: translateX(-50%);
+      background: rgba(15,23,42,0.92); color: #f8fafc;
+      font-size: 11.5px; font-weight: 500; line-height: 1.5;
+      padding: 6px 10px; border-radius: 7px;
+      white-space: nowrap; pointer-events: none; z-index: 100;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    }
+    .kpi-card[data-tip]:hover::before {
+      content: "";
+      position: absolute; bottom: calc(100% + 2px); left: 50%;
+      transform: translateX(-50%);
+      border: 6px solid transparent;
+      border-top-color: rgba(15,23,42,0.92);
+      pointer-events: none; z-index: 100;
+    }
+
+    .kpi-title { font-size: 12px; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+    .kpi-value { font-size: 22px; font-weight: 700; color: var(--text); margin-top: 4px; }
+    .kpi-sub   { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+    .kpi-trend {
+      display: inline-block; font-size: 11px; font-weight: 700;
+      padding: 1px 6px; border-radius: 9999px; margin-left: 4px; vertical-align: middle;
+    }
+    .kpi-trend.up   { color: var(--success); background: var(--success-bg); }
+    .kpi-trend.down { color: var(--danger);  background: var(--danger-bg); }
+    .kpi-trend.flat { color: var(--text-muted); background: var(--diff-zero-bg); }
+
+     
+    .chart-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    .chart-container {
+      background: var(--chart-container-bg); border: 1px solid var(--border);
+      border-radius: 10px; padding: 12px;
+      transition: background-color 0.3s, border-color 0.3s;
+      position: relative;
+    }
+    .chart-title { text-align: center; font-size: 14px; font-weight: 700; color: var(--chart-title-color); margin-bottom: 12px; }
+    @media (max-width: 768px) { .chart-grid { grid-template-columns: 1fr; } }
+
+     
+    .toast-box {
+      padding: 12px 16px; border-radius: 8px; font-size: 14px;
+      margin-bottom: 14px; display: none;
+    }
+    .toast-box.show { display: block; }
+    .toast-danger  { background-color: var(--danger-bg);  color: var(--danger);  border: 1px solid var(--danger); }
+    .toast-success { background-color: var(--success-bg); color: var(--success); border: 1px solid var(--success); }
+
+     
+    .table-container { overflow-x: auto; border-radius: 10px; border: 1px solid var(--border); background: var(--card); transition: background-color 0.3s, border-color 0.3s; }
+    table { border-collapse: collapse; width: 100%; min-width: 950px; font-size: 13.5px; }
+    th, td { border-bottom: 1px solid var(--border); border-right: 1px solid var(--border); padding: 10px 12px; text-align: center; vertical-align: middle; white-space: nowrap; }
+    th { background-color: var(--table-header-bg); color: var(--text); font-weight: 700; position: sticky; top: 0; z-index: 2; letter-spacing: 0.3px; }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background-color: var(--table-hover-bg); }
+
+     
+    .cum-val { font-weight: 700; color: var(--text); }
+    .diff-badge { display: inline-block; font-size: 0.8em; padding: 2px 6px; border-radius: 4px; margin-top: 3px; font-weight: bold; }
+    .diff-up   { color: var(--success); background-color: var(--success-bg); }
+    .diff-down { color: var(--danger);  background-color: var(--danger-bg); }
+    .diff-zero { display: none; }
+    .accuracy-pill { display: inline-block; font-size: 0.8em; font-weight: bold; margin-top: 3px; padding: 2px 8px; border-radius: 9999px; }
+    .acc-high { color: var(--success); background: var(--success-bg); }
+    .acc-mid  { color: var(--warning); background: var(--warning-bg); }
+    .acc-low  { color: var(--danger);  background: var(--danger-bg); }
+
+     
+    .pagination-wrapper { display: flex; justify-content: center; align-items: center; gap: 6px; padding: 14px 16px; background: var(--card); border-top: 1.5px solid var(--border); flex-wrap: wrap; }
+    .pagination-btn { padding: 6px 11px; min-height: 34px; font-size: 13px; border-radius: 6px; cursor: pointer; font-weight: bold; background-color: var(--card); color: var(--text); border: 1px solid var(--border); transition: all 0.18s ease; }
+    .pagination-btn:hover:not(:disabled) { background-color: var(--primary-light); border-color: var(--primary); color: var(--primary); }
+    .pagination-btn:active:not(:disabled) { transform: scale(0.95); }
+    .pagination-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .pagination-btn.active { background-color: var(--primary); color: #fff; border-color: var(--primary); }
+    .pagination-info { font-size: 13px; color: var(--text-muted); margin: 0 4px; font-weight: 500; }
+
+     
+    @media (max-width: 520px) {
+      .pagination-btn.page-num { display: none; }
+    }
+
+     
+    .zero-val { color: var(--text-muted); opacity: 0.45; }
+
+     
+    .no-data {
+      text-align: center; padding: 48px 20px; color: var(--text-muted); font-size: 14px;
+    }
+    .no-data-icon { font-size: 3rem; display: block; margin-bottom: 12px; }
+    .no-data-title { font-size: 16px; font-weight: 700; color: var(--text); margin-bottom: 6px; }
+
+     
+    .mobile-card { display: none !important; background: var(--card); border: 1.5px solid var(--border); border-radius: 12px; padding: 16px; margin-bottom: 12px; box-shadow: 0 2px 6px rgba(0,0,0,0.02); }
+    .mobile-card-header { display: flex; justify-content: space-between; border-bottom: 1px solid var(--border); padding-bottom: 8px; margin-bottom: 10px; font-weight: bold; }
+    .mobile-card-body { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 16px; font-size: 13px; }
+    .mobile-item { display: flex; flex-direction: column; }
+    .mobile-label { color: var(--text-muted); font-size: 11.5px; margin-bottom: 2px; }
+    @media (max-width: 768px) {
+      .table-container { background: transparent !important; border: none !important; }
+      .table-container table { display: none !important; }
+      .mobile-card { display: block !important; }
+      #resultCard { background: transparent !important; border: none !important; box-shadow: none !important; padding: 0 !important; }
+    }
+
+     
+    .spinner { border: 2px solid rgba(255,255,255,0.3); border-top: 2px solid white; border-radius: 50%; width: 14px; height: 14px; animation: spin 0.8s linear infinite; }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+     
+    .theme-switch-container { display: flex; align-items: center; gap: 8px; }
+
+     
+    #filterToggleBtn { display: none; width: 100%; justify-content: center; margin-bottom: 10px; }
+    #filterBody { transition: max-height 0.3s ease, opacity 0.3s ease; overflow: hidden; }
+    @media (max-width: 640px) {
+      #filterToggleBtn { display: flex; }
+      #filterBody.collapsed { max-height: 0 !important; opacity: 0; pointer-events: none; }
+    }
+
+     
+    #backToTop {
+      position: fixed; bottom: 24px; right: 20px;
+      width: 44px; height: 44px; border-radius: 50%;
+      background: var(--primary); color: #fff;
+      font-size: 20px; border: none; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      box-shadow: 0 4px 16px rgba(37,99,235,0.35);
+      opacity: 0; pointer-events: none;
+      transition: opacity 0.25s ease, transform 0.25s ease;
+      z-index: 999;
+    }
+    #backToTop.visible { opacity: 1; pointer-events: auto; }
+    #backToTop:hover { transform: translateY(-2px); background: var(--primary-hover); }
+    #backToTop:active { transform: scale(0.93); }
+
+     
+    @media (max-width: 768px) {
+      button, input[type="text"], input[type="password"], input[type="date"], select {
+        min-height: 44px !important;
+      }
+      .pagination-btn {
+        min-height: 44px !important;
+        min-width: 44px !important;
+      }
+    }
+
+     
+    @media print {
+      body { background: white; padding: 0; }
+      #backToTop, #btnThemeToggle, #btnLogin, #btnRefresh, #btnFilter,
+      .quick-dates, .btn-secondary, .pagination-wrapper,
+      #filterToggleBtn { display: none !important; }
+      .card { box-shadow: none; border: 1px solid #ccc; }
+      .chart-container { break-inside: avoid; }
+      .kpi-card { break-inside: avoid; }
+    }
+  
+    /* ========== 家長專區與單字挑選設定彈窗樣式 ========== */
+    .parent-mission-panel {
+      background: linear-gradient(135deg, #1e1a38, #141628);
+      border: 1.5px solid rgba(139, 108, 240, 0.45);
+      border-radius: 14px; padding: 22px 24px;
+      box-shadow: 0 6px 20px rgba(0,0,0,0.18);
+      margin-bottom: 20px;
+    }
+    .p-chip {
+      display: inline-flex; align-items: center; gap: 5px;
+      background: #252840; border: 1px solid #3d4166; border-radius: 7px;
+      padding: 3px 8px; font-size: 12px; font-weight: 700; color: #e2e8f0;
+    }
+    .p-chip.custom { border-color: #8b6cf0; color: #caa7ff; }
+    .badge-parent-mission {
+      display: inline-block; font-size: 11px; font-weight: 700;
+      padding: 2px 7px; border-radius: 9999px;
+      background: rgba(139, 108, 240, 0.2); color: #8b6cf0;
+      border: 1px solid rgba(139, 108, 240, 0.5); margin-left: 6px;
+    }
+    .p-res-grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 12px; margin-top: 10px;
+    }
+    .p-res-item {
+      display: flex; align-items: center; justify-content: space-between;
+      background: var(--table-header-bg); border: 1px solid var(--border);
+      border-radius: 8px; padding: 8px 12px; font-size: 13px;
+    }
+    .p-res-item.ok { border-left: 4px solid var(--success); }
+    .p-res-item.wrong { border-left: 4px solid var(--danger); background: var(--danger-bg); }
+    .p-res-item.unattempted { border-left: 4px solid var(--text-muted); opacity: 0.8; }
+    .p-res-btn-speak {
+      background: none; border: 1px solid var(--border); border-radius: 5px;
+      color: var(--text-muted); font-size: 12px; padding: 2px 6px; cursor: pointer;
+    }
+    .p-res-btn-speak:hover { color: var(--primary); border-color: var(--primary); }
+
+    /* Modal Dialog */
+    .parent-modal-overlay {
+      position: fixed; inset: 0; background: rgba(10, 12, 20, 0.85);
+      backdrop-filter: blur(6px); z-index: 99999;
+      display: flex; justify-content: center; align-items: center; padding: 12px;
+    }
+    .parent-dialog {
+      background: #1b1d2e; border: 1.5px solid #363a52; border-radius: 20px;
+      width: 100%; max-width: 840px; max-height: 92vh;
+      display: flex; flex-direction: column; overflow: hidden;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6); color: #e8eaf0;
+      animation: pop 0.25s cubic-bezier(0.18, 0.89, 0.32, 1.28);
+    }
+    .parent-head {
+      padding: 16px 20px; border-bottom: 1px solid #2a2d42;
+      display: flex; justify-content: space-between; align-items: center;
+      background: #15172a;
+    }
+    .parent-head h2 { font-size: 16px; font-weight: 800; color: #fff; margin: 0; }
+    .parent-close {
+      background: none; border: none; font-size: 20px; color: #94a3b8;
+      cursor: pointer; padding: 4px 8px; border-radius: 8px; line-height: 1;
+    }
+    .parent-close:hover { background: #252840; color: #fff; }
+    .parent-tabs {
+      display: flex; background: #15172a; border-bottom: 1px solid #2a2d42; padding: 0 16px;
+    }
+    .parent-tab {
+      background: none; border: none; padding: 10px 18px; font-weight: 700;
+      font-size: 13px; color: #94a3b8; cursor: pointer;
+      border-bottom: 2.5px solid transparent; transition: all .15s ease;
+    }
+    .parent-tab.active { color: #8b6cf0; border-bottom-color: #8b6cf0; }
+    .parent-body {
+      padding: 14px 18px; overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 10px;
+    }
+    .parent-search-row { position: relative; width: 100%; }
+    .parent-search-input {
+      width: 100%; padding: 9px 36px 9px 14px; border-radius: 10px;
+      border: 1.5px solid #2a2d42; background: #15172a; color: #e8eaf0;
+      font-size: 13.5px; outline: none; box-sizing: border-box;
+    }
+    .parent-search-input:focus {
+      border-color: #8b6cf0; box-shadow: 0 0 0 3px rgba(139,108,240,0.25);
+    }
+    .search-clear-btn {
+      position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+      background: none; border: none; color: #94a3b8; font-size: 14px;
+      cursor: pointer; padding: 4px; line-height: 1;
+    }
+    .search-clear-btn:hover { color: #f87171; }
+    .parent-presets {
+      display: flex; gap: 6px; flex-wrap: wrap; align-items: center; font-size: 12px;
+    }
+    .preset-btn {
+      background: #1e2136; border: 1px solid #2a2d42; border-radius: 8px;
+      padding: 4px 10px; font-size: 11.5px; font-weight: 700; color: #94a3b8;
+      cursor: pointer; transition: all .15s ease; min-height: 28px;
+    }
+    .preset-btn:hover { border-color: #8b6cf0; color: #fff; }
+    .preset-btn.highlight {
+      background: rgba(139, 108, 240, 0.15); border-color: #8b6cf0; color: #caa7ff;
+    }
+    .preset-btn.highlight:hover { background: #8b6cf0; color: #fff; }
+
+    .parent-dims {
+      display: flex; gap: 6px; background: #15172a; padding: 4px;
+      border-radius: 10px; border: 1px solid #2a2d42; flex-wrap: wrap;
+    }
+    .dim-btn {
+      background: none; border: none; border-radius: 7px; padding: 5px 12px;
+      font-size: 12px; font-weight: 700; color: #94a3b8; cursor: pointer;
+      transition: all .15s ease; min-height: 30px;
+    }
+    .dim-btn:hover { color: #e2e8f0; }
+    .dim-btn.active {
+      background: #8b6cf0; color: #fff; box-shadow: 0 2px 8px rgba(139,108,240,0.3);
+    }
+    .parent-theme-bar {
+      display: flex; flex-wrap: wrap; gap: 6px; background: #15172a;
+      padding: 8px 10px; border-radius: 10px; border: 1px solid #2a2d42;
+    }
+    .theme-chip {
+      background: #1f2238; border: 1px solid #2f344e; border-radius: 6px;
+      padding: 3px 9px; font-size: 11.5px; font-weight: 700; color: #94a3b8;
+      cursor: pointer; transition: all .15s ease; min-height: 26px;
+    }
+    .theme-chip:hover { border-color: #8b6cf0; color: #fff; }
+    .theme-chip.active { background: #6c4ce0; color: #fff; border-color: #6c4ce0; }
+
+    .parent-az-bar {
+      display: flex; flex-wrap: wrap; gap: 4px; background: #15172a;
+      padding: 6px 8px; border-radius: 10px; border: 1px solid #2a2d42;
+    }
+    .az-chip {
+      background: #1f2238; border: 1px solid #2f344e; border-radius: 5px;
+      width: 24px; height: 26px; display: flex; align-items: center; justify-content: center;
+      font-size: 11.5px; font-weight: 800; color: #94a3b8; cursor: pointer;
+      transition: all .12s ease;
+    }
+    .az-chip:hover { border-color: #8b6cf0; color: #fff; }
+    .az-chip.active { background: #8b6cf0; color: #fff; border-color: #8b6cf0; }
+    .az-chip:first-child { width: 36px; }
+
+    .parent-filter-row { display: flex; gap: 6px; flex-wrap: wrap; }
+    .parent-lv-chip {
+      background: #1e2136; border: 1px solid #2a2d42; border-radius: 8px;
+      padding: 4px 10px; font-size: 11.5px; font-weight: 700; color: #94a3b8;
+      cursor: pointer; transition: all .15s ease; min-height: 28px;
+    }
+    .parent-lv-chip.active { background: #2563eb; color: #fff; border-color: #2563eb; }
+
+    .parent-list-tools {
+      display: flex; justify-content: space-between; align-items: center;
+      font-size: 12px; font-weight: 700; color: #94a3b8;
+    }
+    .parent-tool-btn {
+      background: #1e2136; border: 1px solid #2a2d42; border-radius: 6px;
+      padding: 3px 8px; font-size: 11px; font-weight: 700; color: #94a3b8;
+      cursor: pointer; margin-left: 4px; min-height: 24px;
+    }
+    .parent-tool-btn:hover { color: #fff; border-color: #8b6cf0; }
+
+    .parent-word-list {
+      flex: 1; min-height: 240px; max-height: 320px; overflow-y: auto;
+      border: 1px solid #2a2d42; border-radius: 12px; background: #15172a;
+      display: flex; flex-direction: column;
+    }
+    .parent-word-item {
+      display: flex; align-items: center; gap: 10px; padding: 7px 12px;
+      border-bottom: 1px solid #1e2136; cursor: pointer; transition: background .12s;
+    }
+    .parent-word-item:hover { background: #1f2238; }
+    .parent-word-item input[type="checkbox"] {
+      width: 16px; height: 16px; accent-color: #8b6cf0; cursor: pointer;
+    }
+    .parent-word-item .p-w-text {
+      font-weight: 800; font-size: 13.5px; color: #fff; min-width: 110px;
+    }
+    .parent-word-item .p-w-zh {
+      font-size: 12.5px; color: #94a3b8; flex: 1; overflow: hidden;
+      text-overflow: ellipsis; white-space: nowrap;
+    }
+    .parent-word-item .p-w-speak {
+      background: none; border: 1px solid #2a2d42; border-radius: 6px;
+      color: #94a3b8; font-size: 11.5px; padding: 2px 6px; cursor: pointer;
+    }
+    .parent-word-item .p-w-speak:hover { color: #38bdf8; border-color: #38bdf8; }
+    .parent-word-item .p-w-lv {
+      font-size: 10px; font-weight: 800; padding: 2px 6px; border-radius: 5px;
+      color: #fff; flex: none;
+    }
+    .parent-word-item .p-w-badge { font-size: 11px; flex: none; }
+
+    .parent-pagination {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 6px 8px; font-size: 12px; color: #94a3b8; font-weight: 700;
+      background: #15172a; border: 1px solid #2a2d42; border-radius: 10px;
+    }
+    .page-btn-group { display: flex; gap: 4px; align-items: center; }
+    .page-btn {
+      background: #1e2136; border: 1px solid #2a2d42; border-radius: 6px;
+      color: #e2e8f0; padding: 3px 8px; font-size: 11.5px; font-weight: 800; cursor: pointer;
+    }
+    .page-btn:disabled { opacity: 0.35; cursor: default; }
+    .page-btn:not(:disabled):hover { border-color: #38bdf8; color: #38bdf8; }
+    .page-select {
+      background: #15172a; color: #e2e8f0; border: 1px solid #2a2d42;
+      border-radius: 6px; padding: 2px 6px; font-size: 11.5px; outline: none;
+    }
+
+    .parent-selected-box {
+      background: #15172a; border: 1px solid #2a2d42; border-radius: 12px;
+      padding: 8px 12px;
+    }
+    .parent-selected-title {
+      font-size: 12px; font-weight: 800; color: #94a3b8; display: flex;
+      justify-content: space-between; margin-bottom: 5px;
+    }
+    .parent-chips-bar {
+      display: flex; flex-wrap: wrap; gap: 5px; max-height: 75px; overflow-y: auto;
+    }
+    .parent-chip {
+      display: inline-flex; align-items: center; gap: 5px;
+      background: #252840; border: 1px solid #363a52; border-radius: 7px;
+      padding: 2px 7px; font-size: 11.5px; font-weight: 700; color: #e2e8f0;
+    }
+    .parent-chip .rm {
+      color: #94a3b8; cursor: pointer; font-size: 11px; font-weight: 800;
+    }
+    .parent-chip .rm:hover { color: #f87171; }
+
+    .parent-custom-area { display: flex; flex-direction: column; gap: 10px; }
+    .parent-textarea {
+      width: 100%; min-height: 120px; border-radius: 12px; border: 1.5px solid #2a2d42;
+      background: #15172a; color: #e2e8f0; font-family: ui-monospace, monospace;
+      font-size: 14px; padding: 12px; outline: none; resize: vertical; box-sizing: border-box;
+    }
+    .parent-textarea:focus {
+      border-color: #8b6cf0; box-shadow: 0 0 0 3px rgba(139,108,240,0.2);
+    }
+    .parent-goal-row {
+      display: flex; align-items: center; gap: 10px; font-size: 12.5px; font-weight: 700; color: #94a3b8;
+    }
+    .parent-goal-input {
+      width: 65px; padding: 5px 8px; border-radius: 8px; border: 1px solid #2a2d42;
+      background: #15172a; color: #e2e8f0; text-align: center; font-weight: 800; outline: none; font-size: 13px;
+    }
+    .parent-foot {
+      padding: 12px 18px; border-top: 1px solid #2a2d42;
+      display: flex; gap: 10px; justify-content: flex-end; align-items: center; flex-wrap: wrap;
+      background: #15172a;
+    }
+
+  </style>
+
+</head>
+<body>
+
+  <div class="container">
+    
+    <div class="card">
+      <div class="header-title">
+        <h2>\U0001f4ca 學生學習歷程儀表板</h2>
+        <div style="display: flex; align-items: center; gap: 16px;">
+          
+          <div class="theme-switch-container">
+            <button class="btn-secondary" id="btnThemeToggle" onclick="toggleTheme()">\U0001f319 深色模式</button>
+          </div>
+          <div id="userBadge" style="font-size:13.5px; font-weight:600; color:var(--primary);"></div>
+        </div>
+      </div>
+
+      <div id="toast" class="toast-box"></div>
+
+      
+      <div id="loginSection" class="controls-grid">
+        <div class="input-field">
+          <label for="username">帳號</label>
+          <input type="text" id="username" placeholder="請輸入學號/帳號" autocomplete="username" />
+        </div>
+        <div class="input-field">
+          <label for="password">密碼</label>
+          <input type="password" id="password" placeholder="請輸入密碼" autocomplete="current-password" />
+        </div>
+        <button id="btnLogin" onclick="login()">登入系統</button>
+      </div>
+
+      
+      <div id="querySection" style="display:none;">
+        
+        <button id="filterToggleBtn" class="btn-secondary btn-sm" onclick="toggleFilter()">\U0001f53d 展開篩選條件</button>
+        <div id="filterBody">
+          <div class="controls-grid">
+            <div class="input-field">
+              <label for="startDate">開始日期</label>
+              <input type="date" id="startDate" onchange="applyFilter()" />
+            </div>
+            <div class="input-field">
+              <label for="endDate">結束日期</label>
+              <input type="date" id="endDate" onchange="applyFilter()" />
+            </div>
+            <button id="btnFilter" onclick="applyFilter()">\U0001f50d 篩選</button>
+            <button class="btn-secondary" id="btnRefresh" onclick="fetchData(true)">\U0001f504 同步最新</button>
+            <button class="btn-secondary" onclick="exportToCsv()">\U0001f4e5 匯出 CSV</button>
+            <button class="btn-secondary" onclick="logout()" style="margin-left:auto;">登出</button>
+          </div>
+          
+          <div class="quick-dates" id="quickDates">
+            <span style="font-size:12.5px; color:var(--text-muted); align-self:center;">快速選擇：</span>
+            <button class="btn-secondary btn-sm" id="qd-all"       onclick="setQuickDate('all')">全部歷程</button>
+            <button class="btn-secondary btn-sm" id="qd-7days"    onclick="setQuickDate('7days')">最近 7 天</button>
+            <button class="btn-secondary btn-sm" id="qd-30days"   onclick="setQuickDate('30days')">最近 30 天</button>
+            <button class="btn-secondary btn-sm" id="qd-thisMonth" onclick="setQuickDate('thisMonth')">本月紀錄</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    
+    
+    <!-- 👨‍👩‍👧 家長專區 · 今日任務指派中心 -->
+    <div id="parentMissionCard" class="card parent-mission-panel" style="display:none;">
+      <div class="header-title" style="margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+        <h2 style="font-size: 1.25rem; color: #fff; margin: 0; display: flex; align-items: center; gap: 8px;">
+          👨‍👩‍👧 家長專區 · 今日任務指派中心
+        </h2>
+        <span id="pMissionStatusBadge" style="font-size: 12px; font-weight: 700; padding: 4px 12px; border-radius: 9999px; background: #252840; color: #cbd5e1; border: 1px solid #3d4166;">
+          💡 系統自適應出題中
+        </span>
+      </div>
+      <p id="pMissionDesc" style="font-size: 13.5px; color: #cbd5e1; margin: 0 0 12px 0; line-height: 1.6;">
+        目前學生登入遊戲時由系統自適應派題。家長可點擊下方按鈕，從 2000 單字庫中挑選或貼上小考單字，指定學生「開始今天的練習」的施測範圍：
+      </p>
+      <div id="pMissionChipsWrap" style="display:none; margin-bottom: 14px; background: rgba(0,0,0,0.25); border: 1px solid rgba(139, 108, 240, 0.3); border-radius: 10px; padding: 10px 14px;">
+        <div style="font-size: 12px; font-weight: 700; color: #caa7ff; margin-bottom: 6px;">已排程施測單字預覽（學生登入後將直接測驗這些單字）：</div>
+        <div id="pMissionChips" style="display:flex; flex-wrap:wrap; gap:6px; max-height:85px; overflow-y:auto;"></div>
+      </div>
+      <div style="display: flex; flex-wrap: wrap; gap: 10px; align-items: center;">
+        <button class="btn" id="btnOpenParentModal" onclick="openParentModal()" style="background: #8b6cf0; color: #fff; font-weight: 700;">
+          🎯 挑選與設定今日練習單字
+        </button>
+        <button class="btn btn-secondary" id="btnAssignAllWrong" onclick="quickAssignAllWrong()" style="color: #f87171; border-color: rgba(248,113,113,0.4);">
+          ⚠️ 一鍵指派曾錯字特訓
+        </button>
+        <button class="btn btn-secondary" id="btnClearParentMission" onclick="clearParentMission()" style="display:none; color: #94a3b8;">
+          🔄 取消指定（恢復系統自適應出題）
+        </button>
+      </div>
+    </div>
+
+    <!-- 📋 專屬施測單字結果透視專區 -->
+    <div id="parentResultsCard" class="card" style="display:none; padding: 20px; margin-bottom: 20px;">
+      <div class="header-title" style="margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+        <h2 style="font-size: 1.18rem; margin: 0; display: flex; align-items: center; gap: 8px;">
+          📋 最近一次家長指定任務施測成果
+        </h2>
+        <span id="pResultDateBadge" style="font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 6px; background: var(--primary-light); color: var(--primary);">
+          尚無指定測驗紀錄
+        </span>
+      </div>
+      <div id="pResultSummaryRow" style="display: flex; flex-wrap: wrap; gap: 16px; margin-bottom: 14px; font-size: 13.5px; font-weight: 600; color: var(--text);">
+        <!-- populated by JS -->
+      </div>
+      <div style="font-size: 12.5px; font-weight: 700; color: var(--text-muted); margin-bottom: 8px;">
+        施測單字對錯明細（點擊 🔊 試聽發音）：
+      </div>
+      <div id="pResultWordList" style="display: flex; flex-wrap: wrap; gap: 8px;">
+        <!-- populated by JS -->
+      </div>
+    </div>
+
+    <div id="kpiSection" class="kpi-grid" style="display:none;">
+      <div class="kpi-card" data-tip="本次篩選區間內的新增作答題數（非累積）">
+        <div class="kpi-title">區間新增作答 <span id="kpiAttemptsTrend"></span></div>
+        <div class="kpi-value" id="kpiAttempts">0 題</div>
+        <div class="kpi-sub" id="kpiTotalAttempts">總累積：0 題</div>
+      </div>
+      <div class="kpi-card" data-tip="本次篩選區間內答對的題數（非累積）">
+        <div class="kpi-title">區間答對題數 <span id="kpiCorrectTrend"></span></div>
+        <div class="kpi-value" id="kpiCorrect">0 題</div>
+        <div class="kpi-sub" id="kpiTotalCorrect">總累積：0 題</div>
+      </div>
+      <div class="kpi-card" data-tip="本次篩選區間內的平均正確率（答對�作答）">
+        <div class="kpi-title">區間平均正確率 <span id="kpiAccuracyTrend"></span></div>
+        <div class="kpi-value" id="kpiAccuracy">0%</div>
+        <div class="kpi-sub" id="kpiTotalAccuracy">歷史總正確率：0%</div>
+      </div>
+      <div class="kpi-card" data-tip="精通＝連續答對3次｜練習中＝連續答對2次｜學習中＝答對1次">
+        <div class="kpi-title">單字掌握進度 <span id="kpiMasteredTrend"></span></div>
+        <div class="kpi-value" id="kpiMastered">0 個精通</div>
+        <div class="kpi-sub" id="kpiLearning">學習中 / 練習中：0 / 0</div>
+      </div>
+    </div>
+
+
+    
+    <div id="chartCard" class="card" style="display:none; padding: 20px;">
+      <div class="header-title" style="margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+        <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+          <h2 style="font-size: 1.15rem; margin: 0;">\U0001f4c8 學習趨勢圖表</h2>
+          <span id="chartModeBadge" style="display:none; font-size:12px; font-weight:600; padding: 3px 10px; border-radius: 9999px; background: var(--primary-light, #dbeafe); color: var(--primary, #2563eb);"></span>
+        </div>
+        <select id="chartMetricSelect" onchange="updateCharts()" style="min-width: 200px; padding: 8px 12px; font-weight: 600; border-radius: 8px; cursor: pointer;">
+          <option value="total_attempts_correct" selected>作答題數與答對題數</option>
+          <option value="parent_mission">👨‍👩‍👧 家長指定任務施測表現 (作答題數與正確率)</option>
+          <option value="word_mastery">單字熟練度分布 (學習/練習/精通)</option>
+          <option value="score">分數</option>
+          <option value="accuracy">正確率</option>
+          <option value="distinct_words">答對單字數</option>
+          <option value="l1">LEVEL 1 答對與作答題數</option>
+          <option value="l2">LEVEL 2 答對與作答題數</option>
+          <option value="l3">LEVEL 3 答對與作答題數</option>
+          <option value="l4">LEVEL 4 答對與作答題數</option>
+          <option value="l5">LEVEL 5 答對與作答題數</option>
+        </select>
+      </div>
+      
+      <div id="sparseDataNotice" style="display:none; margin-bottom:14px; padding: 12px 16px; border-radius: 10px; background: var(--warning-bg, #fef9c3); color: var(--warning, #854d0e); font-size: 13px; font-weight: 500; line-height: 1.6;"></div>
+      <div class="chart-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 20px;">
+        
+        <div class="chart-container" style="min-height: 320px; display: flex; flex-direction: column;">
+          <div class="chart-title" style="font-size: 14px; font-weight: bold; margin-bottom: 8px;">\U0001f4c8 累積學習歷程 (作答、得分、正確率)</div>
+          <div style="position: relative; flex-grow: 1; height: 280px; width: 100%;">
+            <canvas id="cumChart"></canvas>
+          </div>
+        </div>
+        
+        <div class="chart-container" style="min-height: 320px; display: flex; flex-direction: column;">
+          <div class="chart-title" style="font-size: 14px; font-weight: bold; margin-bottom: 8px;">\U0001f4ca 單日練習表現 (得分與作答)</div>
+          <div style="position: relative; flex-grow: 1; height: 280px; width: 100%;">
+            <canvas id="dailyChart"></canvas>
+          </div>
+        </div>
+        
+        <div class="chart-container" style="min-height: 320px; display: flex; flex-direction: column;">
+          <div class="chart-title" style="font-size: 14px; font-weight: bold; margin-bottom: 8px;">\U0001f3c6 最新累積單字掌握狀態 (最新備份)</div>
+          <div style="position: relative; flex-grow: 1; height: 280px; width: 100%;">
+            <canvas id="wordCumChart"></canvas>
+          </div>
+        </div>
+        
+        <div class="chart-container" style="min-height: 320px; display: flex; flex-direction: column;">
+          <div class="chart-title" style="font-size: 14px; font-weight: bold; margin-bottom: 8px;">\U0001f504 單日單字熟練度增減淨量</div>
+          <div style="position: relative; flex-grow: 1; height: 280px; width: 100%;">
+            <canvas id="wordDailyChart"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    
+    <div id="resultCard" class="card" style="display:none; padding:0; overflow:hidden;">
+      <div class="table-container" id="resultTable"></div>
+    </div>
+  </div>
+
+  
+  <button id="backToTop" onclick="window.scrollTo({top:0,behavior:'smooth'})" title="回到頂部">↑</button>
+
+  <script>
+    
+    let currentUser = null;
+    let currentPass = null;
+    let fullProcessedData = []; 
+    let displayHeaders = [];
+    let lastFilteredData = [];
+    let currentPage = 1;
+    const pageSize = 10;
+    
+    
+    let cumChartInstance = null;
+    let dailyChartInstance = null;
+    let wordCumChartInstance = null;
+    let wordDailyChartInstance = null;
+
+    
+    document.addEventListener("DOMContentLoaded", () => {
+      
+      document.getElementById("username").addEventListener("keyup", e => { if (e.key === "Enter") login(); });
+      document.getElementById("password").addEventListener("keyup", e => { if (e.key === "Enter") login(); });
+      document.getElementById("startDate").addEventListener("keyup", e => { if (e.key === "Enter") applyFilter(); });
+      document.getElementById("endDate").addEventListener("keyup", e => { if (e.key === "Enter") applyFilter(); });
+
+      
+      const savedTheme = localStorage.getItem("theme") || "light";
+      document.documentElement.setAttribute("data-theme", savedTheme);
+      updateThemeButtonText(savedTheme);
+
+      
+      const btt = document.getElementById("backToTop");
+      window.addEventListener("scroll", () => {
+        btt.classList.toggle("visible", window.scrollY > 300);
+      }, { passive: true });
+
+      
+      if (window.innerWidth <= 640) {
+        const fb = document.getElementById("filterBody");
+        if (fb) { fb.style.maxHeight = "0"; fb.classList.add("collapsed"); }
+      }
+    });
+
+    
+    function toggleFilter() {
+      const fb = document.getElementById("filterBody");
+      const btn = document.getElementById("filterToggleBtn");
+      const isCollapsed = fb.classList.contains("collapsed");
+      if (isCollapsed) {
+        fb.classList.remove("collapsed");
+        fb.style.maxHeight = fb.scrollHeight + "px";
+        btn.textContent = "\U0001f53c 收起篩選條件";
+      } else {
+        fb.style.maxHeight = fb.scrollHeight + "px"; 
+        requestAnimationFrame(() => {
+          fb.classList.add("collapsed");
+          fb.style.maxHeight = "0";
+        });
+        btn.textContent = "\U0001f53d 展開篩選條件";
+      }
+    }
+
+    
+    function setQuickDateHighlight(activeId) {
+      ['qd-all','qd-7days','qd-30days','qd-thisMonth'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.classList.toggle('active', id === activeId);
+      });
+    }
+
+    
+    function animateKpiValue(elId, targetText) {
+      const el = document.getElementById(elId);
+      if (!el) return;
+      
+      const match = targetText.match(/[\\d.]+/);
+      if (!match) { el.innerText = targetText; return; }
+      const target = parseFloat(match[0]);
+      const prefix = targetText.substring(0, targetText.indexOf(match[0]));
+      const suffix = targetText.substring(targetText.indexOf(match[0]) + match[0].length);
+      const isFloat = match[0].includes('.');
+      const duration = 500; 
+      const start = performance.now();
+      function step(now) {
+        const progress = Math.min((now - start) / duration, 1);
+        const eased = 1 - Math.pow(1 - progress, 3); 
+        const current = target * eased;
+        el.innerText = prefix + (isFloat ? current.toFixed(1) : Math.round(current)) + suffix;
+        if (progress < 1) requestAnimationFrame(step);
+      }
+      requestAnimationFrame(step);
+    }
+
+
+    
+
+    function toggleTheme() {
+      const currentTheme = document.documentElement.getAttribute("data-theme") || "light";
+      const newTheme = currentTheme === "light" ? "dark" : "light";
+      
+      document.documentElement.setAttribute("data-theme", newTheme);
+      localStorage.setItem("theme", newTheme);
+      updateThemeButtonText(newTheme);
+      
+      
+      if (cumChartInstance || dailyChartInstance || wordCumChartInstance || wordDailyChartInstance) {
+        updateCharts();
+      }
+    }
+
+    function updateThemeButtonText(theme) {
+      const btn = document.getElementById("btnThemeToggle");
+      if (theme === "dark") {
+        btn.innerHTML = "☀️ 明亮模式";
+      } else {
+        btn.innerHTML = "\U0001f319 深色模式";
+      }
+    }
+
+    function showToast(msg, type = "danger") {
+      const el = document.getElementById("toast");
+      el.className = `toast-box toast-${type} show`;
+      el.innerText = msg;
+    }
+
+    function hideToast() {
+      const el = document.getElementById("toast");
+      el.className = "toast-box";
+      el.innerText = "";
+    }
+
+    function setBtnLoading(btnId, isLoading, text) {
+      const btn = document.getElementById(btnId);
+      if (!btn) return;
+      btn.disabled = isLoading;
+      btn.innerHTML = isLoading ? `<div class="spinner"></div> 處理中...` : text;
+    }
+
+    /**
+     * 1. 登入
+     */
+    function login() {
+      hideToast();
+      const u = document.getElementById("username").value.trim();
+      const p = document.getElementById("password").value.trim();
+
+      if (!u || !p) {
+        showToast("請輸入帳號與密碼");
+        return;
+      }
+
+      currentUser = u;
+      currentPass = p;
+      setBtnLoading("btnLogin", true, "登入系統");
+
+      fetchData(false, () => {
+        setBtnLoading("btnLogin", false, "登入系統");
+      });
+    }
+
+    function logout() {
+      currentUser = null;
+      currentPass = null;
+      fullProcessedData = [];
+      displayHeaders = [];
+      lastFilteredData = [];
+      document.getElementById("username").value = "";
+      document.getElementById("password").value = "";
+      document.getElementById("startDate").value = "";
+      document.getElementById("endDate").value = "";
+      setQuickDateHighlight(null);
+      document.getElementById("loginSection").style.display = "flex";
+      document.getElementById("querySection").style.display = "none";
+      document.getElementById("kpiSection").style.display = "none";
+      document.getElementById("chartCard").style.display = "none";
+      document.getElementById("resultCard").style.display = "none";
+      document.getElementById("userBadge").innerText = "";
+      
+      if (cumChartInstance) cumChartInstance.destroy();
+      if (dailyChartInstance) dailyChartInstance.destroy();
+      if (wordCumChartInstance) wordCumChartInstance.destroy();
+      if (wordDailyChartInstance) wordDailyChartInstance.destroy();
+      
+      hideToast();
+    }
+
+    /**
+     * 2. 向伺服器抓取資料
+     */
+    function fetchData(isRefresh = false, onComplete = null) {
+      const btnId = isRefresh ? "btnRefresh" : "btnLogin";
+      const btnText = isRefresh ? "\U0001f504 同步最新" : "登入系統";
+      setBtnLoading(btnId, true, btnText);
+
+      google.script.run
+         .withSuccessHandler(function(resp) {
+          setBtnLoading(btnId, false, btnText);
+          if (onComplete) onComplete();
+
+          if (resp && resp.status === "success") {
+            document.getElementById("loginSection").style.display = "none";
+            document.getElementById("querySection").style.display = "block";
+            document.getElementById("kpiSection").style.display = "grid";
+            document.getElementById("chartCard").style.display = "block";
+            document.getElementById("resultCard").style.display = "block";
+            document.getElementById("userBadge").innerText = `\U0001f464 學生：${resp.username || currentUser}`;
+            hideToast();
+
+            // 加上 fade-in class 播放動畫
+            const kpiSec = document.getElementById("kpiSection");
+            const chartC = document.getElementById("chartCard");
+            const resultC = document.getElementById("resultCard");
+            [kpiSec, chartC, resultC].forEach(el => {
+              if (el) {
+                el.classList.add("fade-in");
+                el.addEventListener("animationend", function handler() {
+                  el.classList.remove("fade-in");
+                  el.removeEventListener("animationend", handler);
+                });
+              }
+            });
+
+            
+            // 提取家長專區設定與施測紀錄
+            currentParentConfig = resp.latestParentConfig || { active: false, wordIds: [], customWords: [], goal: 0 };
+            currentParentMissions = resp.parentMissions || [];
+
+            // 顯示家長任務卡片與成果卡片
+            const pMC = document.getElementById("parentMissionCard");
+            const pRC = document.getElementById("parentResultsCard");
+            if (pMC) pMC.style.display = "block";
+            if (pRC) pRC.style.display = "block";
+
+            // 分析學生單字熟悉度 (曾錯字/精通字/練習中)
+            analyzeStudentRecord(resp.headers || [], resp.data || []);
+
+            // 渲染家長指派中心與成果透視專區
+            renderParentMissionCard();
+            renderParentResultsCard();
+
+            processHistoryWithDiffs(resp.headers || [], resp.data || []);
+            
+            setQuickDateHighlight('qd-all');
+            applyFilter();
+          } else {
+            showToast((resp && resp.message) ? resp.message : "登入失敗或查無紀錄");
+          }
+        })
+        .withFailureHandler(function(err) {
+          setBtnLoading(btnId, false, btnText);
+          if (onComplete) onComplete();
+          showToast("伺服器連線錯誤：" + (err.message || err));
+        })
+        .checkAndGetData({ username: currentUser, password: currentPass });
+    }
+
+    
+
+    function processHistoryWithDiffs(originalHeaders, originalRows) {
+      const exclude = ["完整JSON", "等級", "連勝", "最佳連勝"];
+      const keepIndices = [];
+      displayHeaders = [];
+
+      for (let i = 0; i < originalHeaders.length; i++) {
+        const h = originalHeaders[i];
+        if (exclude.includes(h)) continue;
+        displayHeaders.push(h === "備份時間" ? "日期" : h);
+        keepIndices.push(i);
+      }
+
+      const rows = originalRows.map(r => keepIndices.map(idx => r[idx]));
+      const total = rows.length;
+
+      
+      const dateCol = 0;
+      const attemptsCol = displayHeaders.indexOf("作答題數");
+      const correctCol = displayHeaders.indexOf("答對題數");
+      const accCol = displayHeaders.indexOf("正確率");
+      const masteredCol = displayHeaders.indexOf("精通");
+      
+      const scoreCol = displayHeaders.indexOf("分數");
+      const distWordCol = displayHeaders.indexOf("答對單字數");
+      const learningCol = displayHeaders.indexOf("學習中");
+      const practicingCol = displayHeaders.indexOf("練習中");
+      const l1Col = displayHeaders.findIndex(h => h && h.includes("LEVEL1"));
+      const l2Col = displayHeaders.findIndex(h => h && h.includes("LEVEL2"));
+      const l3Col = displayHeaders.findIndex(h => h && h.includes("LEVEL3"));
+      const l4Col = displayHeaders.findIndex(h => h && h.includes("LEVEL4"));
+      const l5Col = displayHeaders.findIndex(h => h && h.includes("LEVEL5"));
+
+      fullProcessedData = [];
+
+      for (let i = 0; i < total; i++) {
+        const curr = rows[i];
+        const prev = (i + 1 < total) ? rows[i + 1] : null;
+
+        const currAtt = attemptsCol >= 0 ? toIntSafe(curr[attemptsCol]) : 0;
+        const currCor = correctCol >= 0 ? toIntSafe(curr[correctCol]) : 0;
+        const prevAtt = prev && attemptsCol >= 0 ? toIntSafe(prev[attemptsCol]) : 0;
+        const prevCor = prev && correctCol >= 0 ? toIntSafe(prev[correctCol]) : 0;
+
+        const dAtt = prev ? (currAtt - prevAtt) : currAtt;
+        const dCor = prev ? (currCor - prevCor) : currCor;
+        const dAcc = dAtt > 0 ? ((dCor / dAtt) * 100) : 0;
+
+        
+        const getRatioDiff = (col) => {
+          const cVal = col >= 0 ? String(curr[col] || "") : "";
+          const pVal = prev && col >= 0 ? String(prev[col] || "") : "";
+          const cR = parseRatio(cVal);
+          const pR = parseRatio(pVal);
+          return { cumNum: cR.num, cumDen: cR.den, dailyNum: cR.num - pR.num, dailyDen: cR.den - pR.den };
+        };
+        const getIntDiff = (col) => {
+          const cVal = col >= 0 ? toIntSafe(curr[col]) : 0;
+          const pVal = prev && col >= 0 ? toIntSafe(prev[col]) : 0;
+          return { cum: cVal, daily: prev ? (cVal - pVal) : cVal };
+        };
+
+        const cellsHtml = [];
+        for (let c = 0; c < displayHeaders.length; c++) {
+          const valStr = String(curr[c] || "").trim();
+
+          if (c === dateCol) {
+            const hasParentMission = currentParentMissions && currentParentMissions.some(m => m.date === valStr.substring(0, 10) || valStr.startsWith(m.date));
+            const badge = hasParentMission ? `<span class="badge" style="background:#8b6cf0; color:#fff; font-size:11px; padding:2px 6px; border-radius:4px; margin-right:5px; display:inline-block;">👨‍👩‍👧 家長指定</span><br>` : '';
+            cellsHtml.push(`<div>${badge}<strong>${escapeHtml(valStr)}</strong></div>`);
+            continue;
+          }
+
+          if (c === accCol) {
+            const accClass = dAcc >= 80 ? "acc-high" : (dAcc < 50 ? "acc-low" : "acc-mid");
+            cellsHtml.push(`
+              <div class="cum-val">${escapeHtml(valStr || "0%")}</div>
+              <div class="accuracy-pill ${accClass}" title="單日作答正確率">單日: ${dAtt > 0 ? dAcc.toFixed(1) + '%' : '0.0%'}</div>
+            `);
+          } else if (valStr.includes("/")) {
+            const currR = parseRatio(valStr);
+            const prevR = prev ? parseRatio(prev[c]) : { num: 0, den: 0 };
+            const dNum = prev ? (currR.num - prevR.num) : currR.num;
+            const dDen = prev ? (currR.den - prevR.den) : currR.den;
+            const badgeClass = dNum > 0 ? "diff-up" : (dNum < 0 ? "diff-down" : "diff-zero");
+            
+            const percent = currR.den > 0 ? Math.round((currR.num / currR.den) * 100) : 0;
+            const isZero = currR.den === 0;
+            
+            cellsHtml.push(`
+              <div class="${isZero ? 'zero-val' : ''}">
+                <span class="cum-val" style="font-size: 14px;">${escapeHtml(String(currR.num))}/${escapeHtml(String(currR.den))}</span>
+                ${!isZero ? `<br><span style="font-size: 11px; font-weight: bold; color: var(--text-muted);">答對率: ${percent}%</span>` : ''}
+                <div class="diff-badge ${badgeClass}">(${formatSigned(dNum)}/${formatSigned(dDen)})</div>
+              </div>
+            `);
+          } else if (valStr !== "" && /^[-+]?\\d[\\d,]*$/.test(valStr)) {
+            const currN = toIntSafe(valStr);
+            const prevN = prev ? toIntSafe(prev[c]) : 0;
+            const diff = prev ? (currN - prevN) : currN;
+            const badgeClass = diff > 0 ? "diff-up" : (diff < 0 ? "diff-down" : "diff-zero");
+            const isZeroVal = currN === 0;
+
+            cellsHtml.push(`
+              <div class="${isZeroVal ? 'zero-val' : ''}">
+                <span class="cum-val">${escapeHtml(String(currN))}</span>
+                <span class="diff-badge ${badgeClass}">(${formatSigned(diff)})</span>
+              </div>
+            `);
+          } else {
+            cellsHtml.push(escapeHtml(valStr));
+          }
+        }
+
+        // 獲取原始的完整JSON文字 (保存在原陣列對應 '完整JSON' 欄位的位置)
+        const rawJsonColIdx = originalHeaders.indexOf("完整JSON");
+        const rawJsonText = rawJsonColIdx >= 0 ? originalRows[i][rawJsonColIdx] : "";
+
+        fullProcessedData.push({
+          date: String(curr[dateCol] || "").substring(0, 10).replace(/\//g, "-"),
+          rawRow: curr,
+          rawJsonText: rawJsonText,
+          cellsHtml: cellsHtml,
+          dailyAttempts: dAtt,
+          dailyCorrect: dCor,
+          cumAttempts: currAtt,
+          cumCorrect: currCor,
+          mastered: masteredCol >= 0 ? toIntSafe(curr[masteredCol]) : 0,
+          learning: learningCol >= 0 ? toIntSafe(curr[learningCol]) : 0,
+          practicing: practicingCol >= 0 ? toIntSafe(curr[practicingCol]) : 0,
+          accuracyStr: curr[accCol] || "0%",
+          score: getIntDiff(scoreCol),
+          distWord: getIntDiff(distWordCol),
+          l1: getRatioDiff(l1Col),
+          l2: getRatioDiff(l2Col),
+          l3: getRatioDiff(l3Col),
+          l4: getRatioDiff(l4Col),
+          l5: getRatioDiff(l5Col)
+        });
+      }
+    }
+
+    
+    function renderTableAndCards(pagedData) {
+      const resultContainer = document.getElementById("resultTable");
+      
+      
+      let tableHtml = "<table><thead><tr>";
+      displayHeaders.forEach(h => {
+        tableHtml += `<th>${escapeHtml(h).replace(/\n/g, "<br>")}</th>`;
+      });
+      tableHtml += "</tr></thead><tbody>";
+
+      pagedData.forEach(row => {
+        tableHtml += "<tr>";
+        row.cellsHtml.forEach(cell => {
+          tableHtml += `<td>${cell}</td>`;
+        });
+        tableHtml += "</tr>";
+      });
+      tableHtml += "</tbody></table>";
+
+      
+      let cardsHtml = "";
+      pagedData.forEach(row => {
+        cardsHtml += `
+          <div class="mobile-card">
+            <div class="mobile-card-header">
+              <span>\U0001f4c5 日期：${row.date}</span>
+              <span style="color: var(--primary); font-weight: bold;">分數: ${row.score.cum}</span>
+            </div>
+            <div class="mobile-card-body">
+              <div class="mobile-item"><span class="mobile-label">作答正確率</span><strong>${row.accuracyStr}</strong></div>
+              <div class="mobile-item"><span class="mobile-label">精通 / 學習中 / 練習中</span><strong>${row.mastered} / ${row.learning} / ${row.practicing}</strong></div>
+              <div class="mobile-item"><span class="mobile-label">LEVEL 1 入門</span><strong>${row.l1.cumNum}/${row.l1.cumDen}</strong></div>
+              <div class="mobile-item"><span class="mobile-label">LEVEL 2 基礎</span><strong>${row.l2.cumNum}/${row.l2.cumDen}</strong></div>
+              <div class="mobile-item"><span class="mobile-label">LEVEL 3 進階</span><strong>${row.l3.cumNum}/${row.l3.cumDen}</strong></div>
+              <div class="mobile-item"><span class="mobile-label">LEVEL 4 挑戰</span><strong>${row.l4.cumNum}/${row.l4.cumDen}</strong></div>
+              <div class="mobile-item"><span class="mobile-label">LEVEL 5 精熟</span><strong>${row.l5.cumNum}/${row.l5.cumDen}</strong></div>
+            </div>
+          </div>
+        `;
+      });
+
+      // --- 分頁控制按鈕生成 ---
+      const totalPages = Math.ceil(lastFilteredData.length / pageSize);
+      let pagHtml = "";
+      if (totalPages > 1) {
+        pagHtml += `<div class="pagination-wrapper">`;
+        pagHtml += `<button class="pagination-btn" onclick="changePage(1)" ${currentPage === 1 ? 'disabled' : ''}>� 首頁</button>`;
+        pagHtml += `<button class="pagination-btn" onclick="changePage(${currentPage - 1})" ${currentPage === 1 ? 'disabled' : ''}>‹ 上頁</button>`;
+        
+        let startPage = Math.max(1, currentPage - 2);
+        let endPage = Math.min(totalPages, currentPage + 2);
+        
+        for (let p = startPage; p <= endPage; p++) {
+          pagHtml += `<button class="pagination-btn page-num ${p === currentPage ? 'active' : ''}" onclick="changePage(${p})">${p}</button>`;
+        }
+        
+        pagHtml += `<button class="pagination-btn" onclick="changePage(${currentPage + 1})" ${currentPage === totalPages ? 'disabled' : ''}>下頁 ›</button>`;
+        pagHtml += `<button class="pagination-btn" onclick="changePage(${totalPages})" ${currentPage === totalPages ? 'disabled' : ''}>末頁 �</button>`;
+        pagHtml += `<span class="pagination-info">第 ${currentPage} / ${totalPages} 頁 (共 ${lastFilteredData.length} 筆)</span>`;
+        pagHtml += `</div>`;
+      }
+
+      resultContainer.innerHTML = tableHtml + cardsHtml + pagHtml;
+    }
+
+    function changePage(page) {
+      currentPage = page;
+      const startIndex = (currentPage - 1) * pageSize;
+      const endIndex = startIndex + pageSize;
+      const pagedData = lastFilteredData.slice(startIndex, endIndex);
+      renderTableAndCards(pagedData);
+      
+      
+      document.getElementById("resultCard").scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    
+
+    function applyFilter(resetPage = true) {
+      const startDate = document.getElementById("startDate").value;
+      const endDate = document.getElementById("endDate").value;
+      const resultContainer = document.getElementById("resultTable");
+
+      if (!fullProcessedData || fullProcessedData.length === 0) {
+        resultContainer.innerHTML = `
+          <div class="no-data">
+            <span class="no-data-icon">\U0001f4ed</span>
+            <div class="no-data-title">尚無學習歷程資料</div>
+            <div>目前尚無任何同步的學習記錄，請確認您已開始進行作答練習。</div>
+          </div>`;
+        updateKpis([]);
+        updateCharts();
+        return;
+      }
+
+      lastFilteredData = fullProcessedData.filter(item => {
+        if (!item.date) return true;
+        if (startDate && item.date < startDate) return false;
+        if (endDate && item.date > endDate) return false;
+        return true;
+      });
+
+      if (lastFilteredData.length === 0) {
+        resultContainer.innerHTML = `
+          <div class="no-data">
+            <span class="no-data-icon">\U0001f4ed</span>
+            <div class="no-data-title">查無學習紀錄</div>
+            <div>此日期範圍內沒有任何練習資料，請調整篩選條件或確認資料是否已同步。</div>
+          </div>`;
+        updateKpis([]);
+        updateCharts();
+        return;
+      }
+
+      if (resetPage) currentPage = 1;
+      updateKpis(lastFilteredData);
+
+      
+      const startIndex = (currentPage - 1) * pageSize;
+      const endIndex = startIndex + pageSize;
+      const pagedData = lastFilteredData.slice(startIndex, endIndex);
+      
+      renderTableAndCards(pagedData);
+      updateCharts(); 
+    }
+
+    
+
+    function updateKpis(filteredList) {
+      if (!filteredList || filteredList.length === 0) {
+        document.getElementById("kpiAttempts").innerText = "0 題";
+        document.getElementById("kpiTotalAttempts").innerText = "總累積：0 題";
+        document.getElementById("kpiCorrect").innerText = "0 題";
+        document.getElementById("kpiTotalCorrect").innerText = "總累積：0 題";
+        document.getElementById("kpiAccuracy").innerText = "0%";
+        document.getElementById("kpiTotalAccuracy").innerText = "歷史總正確率：0%";
+        document.getElementById("kpiMastered").innerText = "0 個精通";
+        document.getElementById("kpiLearning").innerText = "學習中 / 練習中：0 / 0";
+        document.getElementById("kpiAttemptsTrend").innerHTML = "";
+        document.getElementById("kpiCorrectTrend").innerHTML = "";
+        document.getElementById("kpiAccuracyTrend").innerHTML = "";
+        document.getElementById("kpiMasteredTrend").innerHTML = "";
+        return;
+      }
+      let totalDailyAttempts = 0;
+      let totalDailyCorrect = 0;
+      filteredList.forEach(r => {
+        totalDailyAttempts += r.dailyAttempts;
+        totalDailyCorrect += r.dailyCorrect;
+      });
+      const periodAcc = totalDailyAttempts > 0 ? ((totalDailyCorrect / totalDailyAttempts) * 100).toFixed(1) + "%" : "0%";
+      const latest = filteredList[0];
+      const earliest = filteredList[filteredList.length - 1];
+
+      animateKpiValue("kpiAttempts", `${totalDailyAttempts} 題`);
+      animateKpiValue("kpiTotalAttempts", `總累積：${latest.cumAttempts} 題`);
+      animateKpiValue("kpiCorrect", `${totalDailyCorrect} 題`);
+      animateKpiValue("kpiTotalCorrect", `總累積：${latest.cumCorrect} 題`);
+      animateKpiValue("kpiAccuracy", periodAcc);
+      animateKpiValue("kpiTotalAccuracy", `歷史總正確率：${latest.accuracyStr}`);
+      animateKpiValue("kpiMastered", `${latest.mastered} 個精通`);
+      document.getElementById("kpiLearning").innerText = `學習中 / 練習中：${latest.learning} / ${latest.practicing}`;
+
+      // ── 計算與顯示趨勢箭頭 ──
+      function renderTrend(newVal, oldVal, isPercent = false) {
+        const diff = newVal - oldVal;
+        const trendElClass = diff > 0 ? 'up' : (diff < 0 ? 'down' : 'flat');
+        const arrow = diff > 0 ? '▲' : (diff < 0 ? '▼' : '●');
+        const sign = diff > 0 ? '+' : '';
+        const diffText = isPercent ? `${sign}${diff.toFixed(1)}%` : `${sign}${diff}`;
+        return `<span class="kpi-trend ${trendElClass}" title="對比區間最早一筆資料: ${diffText}">${arrow}</span>`;
+      }
+
+      document.getElementById("kpiAttemptsTrend").innerHTML = renderTrend(latest.cumAttempts, earliest.cumAttempts);
+      document.getElementById("kpiCorrectTrend").innerHTML = renderTrend(latest.cumCorrect, earliest.cumCorrect);
+
+      const latestAcc = parseFloat(latest.accuracyStr) || 0;
+      const earliestAcc = parseFloat(earliest.accuracyStr) || 0;
+      document.getElementById("kpiAccuracyTrend").innerHTML = renderTrend(latestAcc, earliestAcc, true);
+
+      document.getElementById("kpiMasteredTrend").innerHTML = renderTrend(latest.mastered, earliest.mastered);
+    }
+
+    /**
+     * 6. 更新圖表 (Chart.js，具備長週期大數據週聚合降噪功能)
+     */
+    function updateCharts() {
+      if (!lastFilteredData || lastFilteredData.length === 0) {
+        if (cumChartInstance) cumChartInstance.destroy();
+        if (dailyChartInstance) dailyChartInstance.destroy();
+        if (wordCumChartInstance) wordCumChartInstance.destroy();
+        if (wordDailyChartInstance) wordDailyChartInstance.destroy();
+        return;
+      }
+      const isDark = document.documentElement.getAttribute("data-theme") === "dark";
+      const gridColor = isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.05)";
+      const labelColor = isDark ? "#94a3b8" : "#64748b";
+
+      const metric = document.getElementById("chartMetricSelect").value;
+      const modeBadge = document.getElementById("chartModeBadge");
+      const sparseNotice = document.getElementById("sparseDataNotice");
+
+      // 複製並反轉陣列，讓圖表時間軸由左(舊)到右(新)
+      let rawChrono = [...lastFilteredData].reverse();
+      const totalRecords = rawChrono.length;
+
+      
+      if (totalRecords < 3) {
+        sparseNotice.style.display = "block";
+        sparseNotice.innerHTML = `\U0001f4a1 目前僅有 <strong>${totalRecords} 筆</strong>練習紀錄，資料不足以繪製完整趨勢圖。<br>建議持續練習後再查看長期趨勢，每次登入作答後資料將自動更新！`;
+      } else {
+        sparseNotice.style.display = "none";
+      }
+
+      // ── 三級智能聚合 ──
+      
+      let daySpan = 0;
+      if (totalRecords >= 2) {
+        const firstDate = new Date(rawChrono[0].date);
+        const lastDate  = new Date(rawChrono[totalRecords - 1].date);
+        daySpan = Math.round(Math.abs(lastDate - firstDate) / (1000 * 60 * 60 * 24));
+      }
+
+      
+      function groupByCalendarWeek(data) {
+        const buckets = {};
+        const order = [];
+        data.forEach(item => {
+          const d = new Date(item.date);
+          
+          const day = d.getDay() || 7;
+          const thursday = new Date(d);
+          thursday.setDate(d.getDate() + 4 - day);
+          const yearStart = new Date(thursday.getFullYear(), 0, 1);
+          const weekNo = Math.ceil(((thursday - yearStart) / 86400000 + 1) / 7);
+          const key = `${thursday.getFullYear()}-W${String(weekNo).padStart(2,'0')}`;
+          if (!buckets[key]) { buckets[key] = []; order.push(key); }
+          buckets[key].push(item);
+        });
+        return order.map(k => buckets[k]);
+      }
+
+      
+      function groupByMonth(data) {
+        const buckets = {};
+        const order = [];
+        data.forEach(item => {
+          const key = item.date.substring(0, 7); 
+          if (!buckets[key]) { buckets[key] = []; order.push(key); }
+          buckets[key].push(item);
+        });
+        return order.map(k => buckets[k]);
+      }
+
+      
+      function aggregateBuckets(buckets, labelFn) {
+        return buckets.map((bucket, bIdx) => {
+          const lastItem = bucket[bucket.length - 1];
+          const levels = {};
+          ['l1','l2','l3','l4','l5'].forEach(lKey => {
+            levels[lKey] = {
+              cumNum: lastItem[lKey].cumNum, cumDen: lastItem[lKey].cumDen,
+              dailyNum: bucket.reduce((s,i) => s + i[lKey].dailyNum, 0),
+              dailyDen: bucket.reduce((s,i) => s + i[lKey].dailyDen, 0)
+            };
+          });
+          return {
+            date: labelFn(bIdx, bucket),
+            score:    { cum: lastItem.score.cum, daily: bucket.reduce((s,i) => s + i.score.daily, 0) },
+            distWord: { cum: lastItem.distWord.cum, daily: bucket.reduce((s,i) => s + i.distWord.daily, 0) },
+            dailyAttempts: bucket.reduce((s,i) => s + i.dailyAttempts, 0),
+            dailyCorrect:  bucket.reduce((s,i) => s + i.dailyCorrect, 0),
+            cumAttempts: lastItem.cumAttempts, cumCorrect: lastItem.cumCorrect,
+            accuracyStr: lastItem.accuracyStr,
+            mastered: lastItem.mastered, learning: lastItem.learning, practicing: lastItem.practicing,
+            ...levels
+          };
+        });
+      }
+
+      let chronoData = [];
+      let labels = [];
+      let modeText = "";
+
+      
+      const isMobile = window.innerWidth < 768;
+      const weekThreshold  = isMobile ? 14 : 30;   
+      const monthThreshold = isMobile ? 45 : 90;   
+
+      if (totalRecords < 3) {
+        
+        chronoData = rawChrono;
+        labels = chronoData.map(d => d.date.substring(5));
+        modeText = `\U0001f4c5 日視圖 (${totalRecords} 筆)`;
+      } else if (daySpan > monthThreshold || totalRecords > (isMobile ? 30 : 60)) {
+        
+        const buckets = groupByMonth(rawChrono);
+        chronoData = aggregateBuckets(buckets, (i, bucket) => bucket[0].date.substring(0,7));
+        labels = chronoData.map(d => d.date);
+        modeText = `\U0001f4c5 月視圖 (聚合自 ${daySpan} 天 / ${totalRecords} 筆)`;
+      } else if (daySpan > weekThreshold || totalRecords > weekThreshold) {
+        
+        const buckets = groupByCalendarWeek(rawChrono);
+        chronoData = aggregateBuckets(buckets, (i, bucket) => {
+          const d = new Date(bucket[0].date);
+          return `${d.getMonth()+1}/${d.getDate()} 週`;
+        });
+        labels = chronoData.map(d => d.date);
+        modeText = `\U0001f4c5 週視圖 (聚合自 ${daySpan} 天 / ${totalRecords} 筆)`;
+      } else {
+        
+        chronoData = rawChrono;
+        labels = chronoData.map(d => d.date.substring(5));
+        modeText = `\U0001f4c5 日視圖 (${totalRecords} 筆 / ${daySpan} 天)`;
+      }
+
+
+      
+      modeBadge.textContent = modeText;
+      modeBadge.style.display = "inline-block";
+
+      
+      const colorPrimary = isDark ? '#60a5fa' : '#2563eb';
+      const colorSuccess = '#16a34a';
+      const colorAttempt = isDark ? '#475569' : '#94a3b8';
+
+      const createLineDataset = (label, data, color) => ({
+        label, data,
+        borderColor: color,
+        backgroundColor: color === colorPrimary ? (isDark ? 'rgba(96,165,250,0.1)' : 'rgba(37,99,235,0.1)') : 'rgba(22,163,74,0.1)',
+        borderWidth: isMobile ? 1.5 : 2,
+        fill: true, tension: 0.3,
+        pointRadius: isMobile ? 2 : 4,
+        pointHoverRadius: isMobile ? 4 : 6
+      });
+
+
+      const createBarDataset = (label, data, color) => ({
+        label, data, backgroundColor: color, borderRadius: 4
+      });
+
+      let cumDatasets = [];
+      let dailyDatasets = [];
+      let cumYTitle = "累積數值";
+      let dailyYTitle = "單日數量";
+
+
+      if (metric === "parent_mission") {
+        cumYTitle = "正確率 (%)";
+        dailyYTitle = "作答題數";
+
+        cumDatasets.push({
+          type: 'line',
+          label: "家長指定練習正確率 (%)",
+          data: chronoData.map(d => {
+            const pm = currentParentMissions.find(m => m.date === d.date || d.date.startsWith(m.date));
+            return pm ? pm.rate : null;
+          }),
+          borderColor: '#8b6cf0',
+          backgroundColor: 'rgba(139, 108, 240, 0.15)',
+          borderWidth: 2.5,
+          pointRadius: 5,
+          pointHoverRadius: 7,
+          fill: true,
+          tension: 0.3,
+          spanGaps: true
+        });
+
+        dailyDatasets.push({
+          type: 'bar',
+          label: "家長指定作答題數",
+          data: chronoData.map(d => {
+            const pm = currentParentMissions.find(m => m.date === d.date || d.date.startsWith(m.date));
+            return pm ? pm.answered : 0;
+          }),
+          backgroundColor: 'rgba(139, 108, 240, 0.75)'
+        });
+        dailyDatasets.push({
+          type: 'bar',
+          label: "家長指定答對題數",
+          data: chronoData.map(d => {
+            const pm = currentParentMissions.find(m => m.date === d.date || d.date.startsWith(m.date));
+            return pm ? pm.correct : 0;
+          }),
+          backgroundColor: 'rgba(34, 197, 94, 0.75)'
+        });
+      } else if (metric === "word_mastery") {
+        cumYTitle = "單字量";
+        dailyYTitle = "單日變化量";
+
+        
+        const cMastered = '#16a34a'; 
+        const cPracticing = '#2563eb'; 
+        const cLearning = '#d97706'; 
+        const cTotalWord = isDark ? '#f8fafc' : '#0f172a'; 
+
+        
+        const lastIdx = chronoData.length - 1;
+
+        cumDatasets.push({
+          type: 'line',
+          label: "總答對單字數",
+          data: chronoData.map(d => d.distWord.cum),
+          borderColor: cTotalWord,
+          borderWidth: 2.5,
+          pointRadius: 4,
+          pointHoverRadius: 6,
+          fill: false,
+          tension: 0.3,
+          order: -1 
+        });
+
+        cumDatasets.push({
+          type: 'bar',
+          label: "精通",
+          data: chronoData.map((d, idx) => idx === lastIdx ? d.mastered : 0),
+          backgroundColor: cMastered
+        });
+        cumDatasets.push({
+          type: 'bar',
+          label: "練習中",
+          data: chronoData.map((d, idx) => idx === lastIdx ? d.practicing : 0),
+          backgroundColor: cPracticing
+        });
+        cumDatasets.push({
+          type: 'bar',
+          label: "學習中",
+          data: chronoData.map((d, idx) => idx === lastIdx ? d.learning : 0),
+          backgroundColor: cLearning
+        });
+
+        
+        const dailyMastered = chronoData.map((d, idx) => {
+          if (idx === 0) return d.mastered;
+          return d.mastered - chronoData[idx - 1].mastered;
+        });
+        const dailyPracticing = chronoData.map((d, idx) => {
+          if (idx === 0) return d.practicing;
+          return d.practicing - chronoData[idx - 1].practicing;
+        });
+        const dailyLearning = chronoData.map((d, idx) => {
+          if (idx === 0) return d.learning;
+          return d.learning - chronoData[idx - 1].learning;
+        });
+
+        dailyDatasets.push({
+          label: "精通淨增",
+          data: dailyMastered,
+          backgroundColor: cMastered
+        });
+        dailyDatasets.push({
+          label: "練習中淨增",
+          data: dailyPracticing,
+          backgroundColor: cPracticing
+        });
+        dailyDatasets.push({
+          label: "學習中淨增",
+          data: dailyLearning,
+          backgroundColor: cLearning
+        });
+      }
+      else if (metric === "score") {
+        cumDatasets.push(createLineDataset("總分數", chronoData.map(d => d.score.cum), colorPrimary));
+        dailyDatasets.push(createBarDataset("單日獲得分數", chronoData.map(d => d.score.daily), colorSuccess));
+      } 
+      else if (metric === "accuracy") {
+        cumYTitle = "正確率 (%)";
+        dailyYTitle = "單日正確率 (%)";
+        cumDatasets.push(createLineDataset("總正確率 (%)", chronoData.map(d => parseFloat(d.accuracyStr) || 0), colorPrimary));
+        dailyDatasets.push(createBarDataset("單日正確率 (%)", chronoData.map(d => d.dailyAttempts > 0 ? parseFloat((d.dailyCorrect / d.dailyAttempts * 100).toFixed(1)) : 0), colorPrimary));
+      }
+      else if (metric === "distinct_words") {
+        cumDatasets.push(createLineDataset("總答對單字數", chronoData.map(d => d.distWord.cum), colorPrimary));
+        dailyDatasets.push(createBarDataset("單日新增單字數", chronoData.map(d => d.distWord.daily), colorSuccess));
+      }
+      else if (metric === "total_attempts_correct" || metric.startsWith("l")) {
+        
+        let titleName = "";
+        let dataMap = null;
+
+        if (metric === "total_attempts_correct") {
+          titleName = "全部作答";
+          cumDatasets.push(createLineDataset("累積正確率 (%)", chronoData.map(d => d.cumAttempts > 0 ? parseFloat((d.cumCorrect / d.cumAttempts * 100).toFixed(1)) : 0), colorPrimary));
+          dailyDatasets.push(createBarDataset("作答題數 (灰色)", chronoData.map(d => d.dailyAttempts), colorAttempt));
+          dailyDatasets.push(createBarDataset("答對題數 (綠色)", chronoData.map(d => d.dailyCorrect), colorSuccess));
+        } else {
+          const lKey = metric; 
+          const titleMap = { l1: "LEVEL 1", l2: "LEVEL 2", l3: "LEVEL 3", l4: "LEVEL 4", l5: "LEVEL 5" };
+          titleName = titleMap[lKey];
+
+          
+          cumDatasets.push(createLineDataset(`${titleName} 累積正確率 (%)`, chronoData.map(d => {
+            const num = d[lKey].cumNum;
+            const den = d[lKey].cumDen;
+            return den > 0 ? parseFloat((num / den * 100).toFixed(1)) : 0;
+          }), colorPrimary));
+
+          
+          dailyDatasets.push(createBarDataset(`作答題數 (灰色)`, chronoData.map(d => d[lKey].dailyDen), colorAttempt));
+          dailyDatasets.push(createBarDataset(`答對題數 (綠色)`, chronoData.map(d => d[lKey].dailyNum), colorSuccess));
+        }
+        cumYTitle = "正確率 (%)";
+      }
+
+      
+      const ctxCum = document.getElementById('cumChart').getContext('2d');
+      const ctxDaily = document.getElementById('dailyChart').getContext('2d');
+      const ctxWordCum = document.getElementById('wordCumChart').getContext('2d');
+      const ctxWordDaily = document.getElementById('wordDailyChart').getContext('2d');
+
+      if (cumChartInstance) cumChartInstance.destroy();
+      if (dailyChartInstance) dailyChartInstance.destroy();
+      if (wordCumChartInstance) wordCumChartInstance.destroy();
+      if (wordDailyChartInstance) wordDailyChartInstance.destroy();
+
+      
+      const getCommonOptions = (yTitle, showLegend, forceInteger = false, isStacked = false) => {
+        return {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { 
+            legend: { 
+              display: showLegend,
+              position: 'top',
+              labels: { 
+                usePointStyle: true, 
+                boxWidth: window.innerWidth < 768 ? 6 : 8, 
+                padding: window.innerWidth < 768 ? 8 : 12, 
+                font: { 
+                  weight: 'bold',
+                  size: window.innerWidth < 768 ? 10 : 11
+                },
+                color: labelColor
+              }
+            },
+            tooltip: {
+              padding: window.innerWidth < 768 ? 6 : 10,
+              bodyFontSize: window.innerWidth < 768 ? 11 : 13,
+              titleFontSize: window.innerWidth < 768 ? 12 : 14
+            }
+          },
+          scales: { 
+            y: { 
+              stacked: isStacked,
+              beginAtZero: true,
+              title: { 
+                display: !!yTitle, 
+                text: yTitle, 
+                color: labelColor, 
+                font: { size: window.innerWidth < 768 ? 10 : 12, weight: '600' } 
+              },
+              grid: { color: gridColor },
+              ticks: { 
+                color: labelColor,
+                font: { size: window.innerWidth < 768 ? 9 : 11 },
+                ...(forceInteger ? {
+                  stepSize: 1,
+                  callback: function(value) {
+                    if (Math.floor(value) === value) {
+                      return value;
+                    }
+                  }
+                } : {})
+              }
+            },
+            x: {
+              stacked: isStacked,
+              grid: { color: gridColor },
+              ticks: { 
+                color: labelColor,
+                font: { size: isMobile ? 9 : 11 },
+                maxRotation: isMobile ? 45 : 30,
+                minRotation: 0,
+                
+                maxTicksLimit: isMobile ? 7 : 12,
+                autoSkip: true
+              }
+            }
+          },
+          interaction: { mode: 'index', intersect: false }
+        };
+      };
+
+      
+      let activeCumDatasets = [];
+      let activeCumYTitle = "累積數值";
+      
+      if (metric === "score") {
+        activeCumDatasets.push(createLineDataset("總分數", chronoData.map(d => d.score.cum), colorPrimary));
+      } else if (metric === "accuracy") {
+        activeCumYTitle = "正確率 (%)";
+        activeCumDatasets.push(createLineDataset("總正確率 (%)", chronoData.map(d => parseFloat(d.accuracyStr) || 0), colorPrimary));
+      } else if (metric === "distinct_words") {
+        activeCumDatasets.push(createLineDataset("總答對單字數", chronoData.map(d => d.distWord.cum), colorPrimary));
+      } else if (metric === "total_attempts_correct") {
+        activeCumYTitle = "正確率 (%)";
+        activeCumDatasets.push(createLineDataset("累積正確率 (%)", chronoData.map(d => d.cumAttempts > 0 ? parseFloat((d.cumCorrect / d.cumAttempts * 100).toFixed(1)) : 0), colorPrimary));
+      } else if (metric.startsWith("l")) {
+        const titleMap = { l1: "LEVEL 1", l2: "LEVEL 2", l3: "LEVEL 3", l4: "LEVEL 4", l5: "LEVEL 5" };
+        activeCumYTitle = "正確率 (%)";
+        activeCumDatasets.push(createLineDataset(`${titleMap[metric]} 累積正確率 (%)`, chronoData.map(d => {
+          const num = d[metric].cumNum;
+          const den = d[metric].cumDen;
+          return den > 0 ? parseFloat((num / den * 100).toFixed(1)) : 0;
+        }), colorPrimary));
+      } else {
+        activeCumDatasets.push(createLineDataset("總分數", chronoData.map(d => d.score.cum), colorPrimary));
+      }
+
+      cumChartInstance = new Chart(ctxCum, {
+        type: 'line',
+        data: { labels: labels, datasets: activeCumDatasets },
+        options: getCommonOptions(activeCumYTitle, true, false, false)
+      });
+
+
+      
+      let activeDailyDatasets = [];
+      let activeDailyYTitle = "單日數量";
+
+      if (metric === "score") {
+        activeDailyDatasets.push(createBarDataset("單日獲得分數", chronoData.map(d => d.score.daily), colorSuccess));
+      } else if (metric === "accuracy") {
+        activeDailyYTitle = "正確率 (%)";
+        activeDailyDatasets.push(createBarDataset("單日正確率 (%)", chronoData.map(d => d.dailyAttempts > 0 ? parseFloat((d.dailyCorrect / d.dailyAttempts * 100).toFixed(1)) : 0), colorPrimary));
+      } else if (metric === "distinct_words") {
+        activeDailyDatasets.push(createBarDataset("單日新增單字數", chronoData.map(d => d.distWord.daily), colorSuccess));
+      } else if (metric === "total_attempts_correct") {
+        activeDailyDatasets.push(createBarDataset("作答題數 (灰色)", chronoData.map(d => d.dailyAttempts), colorAttempt));
+        activeDailyDatasets.push(createBarDataset("答對題數 (綠色)", chronoData.map(d => d.dailyCorrect), colorSuccess));
+      } else if (metric.startsWith("l")) {
+        activeDailyDatasets.push(createBarDataset("作答題數 (灰色)", chronoData.map(d => d[metric].dailyDen), colorAttempt));
+        activeDailyDatasets.push(createBarDataset("答對題數 (綠色)", chronoData.map(d => d[metric].dailyNum), colorSuccess));
+      } else {
+        activeDailyDatasets.push(createBarDataset("作答題數 (灰色)", chronoData.map(d => d.dailyAttempts), colorAttempt));
+        activeDailyDatasets.push(createBarDataset("答對題數 (綠色)", chronoData.map(d => d.dailyCorrect), colorSuccess));
+      }
+
+      dailyChartInstance = new Chart(ctxDaily, {
+        type: 'bar',
+        data: { labels: labels, datasets: activeDailyDatasets },
+        options: getCommonOptions(activeDailyYTitle, activeDailyDatasets.length > 1, true, false)
+      });
+
+
+      
+      const cMastered = '#16a34a'; 
+      const cPracticing = '#2563eb'; 
+      const cLearning = '#d97706'; 
+      const cTotalWord = isDark ? '#f8fafc' : '#0f172a';
+      const lastIdx = chronoData.length - 1;
+
+      const wordCumDatasets = [
+        {
+          type: 'line',
+          label: "總答對單字數",
+          data: chronoData.map(d => d.distWord.cum),
+          borderColor: cTotalWord,
+          borderWidth: 2,
+          pointRadius: 3,
+          fill: false,
+          tension: 0.3,
+          order: -1
+        },
+        {
+          type: 'bar',
+          label: "精通 (累積)",
+          data: chronoData.map((d, idx) => idx === lastIdx ? d.mastered : 0),
+          backgroundColor: cMastered
+        },
+        {
+          type: 'bar',
+          label: "練習中 (累積)",
+          data: chronoData.map((d, idx) => idx === lastIdx ? d.practicing : 0),
+          backgroundColor: cPracticing
+        },
+        {
+          type: 'bar',
+          label: "學習中 (累積)",
+          data: chronoData.map((d, idx) => idx === lastIdx ? d.learning : 0),
+          backgroundColor: cLearning
+        }
+      ];
+
+      wordCumChartInstance = new Chart(ctxWordCum, {
+        data: { labels: labels, datasets: wordCumDatasets },
+        options: getCommonOptions("單字量", true, true, true)
+      });
+
+
+      
+      const dailyMastered = chronoData.map((d, idx) => idx === 0 ? d.mastered : d.mastered - chronoData[idx - 1].mastered);
+      const dailyPracticing = chronoData.map((d, idx) => idx === 0 ? d.practicing : d.practicing - chronoData[idx - 1].practicing);
+      const dailyLearning = chronoData.map((d, idx) => idx === 0 ? d.learning : d.learning - chronoData[idx - 1].learning);
+
+      const wordDailyDatasets = [
+        {
+          label: "精通淨增",
+          data: dailyMastered,
+          backgroundColor: cMastered
+        },
+        {
+          label: "練習中淨增",
+          data: dailyPracticing,
+          backgroundColor: cPracticing
+        },
+        {
+          label: "學習中淨增",
+          data: dailyLearning,
+          backgroundColor: cLearning
+        }
+      ];
+
+      wordDailyChartInstance = new Chart(ctxWordDaily, {
+        type: 'bar',
+        data: { labels: labels, datasets: wordDailyDatasets },
+        options: getCommonOptions("變化量", true, true, true)
+      });
+    }
+
+    
+
+    function setQuickDate(type) {
+      const today = new Date();
+      const endStr = formatDateYMD(today);
+      let startStr = "";
+
+      if (type === "7days") {
+        const d = new Date();
+        d.setDate(d.getDate() - 6);
+        startStr = formatDateYMD(d);
+      } else if (type === "30days") {
+        const d = new Date();
+        d.setDate(d.getDate() - 29);
+        startStr = formatDateYMD(d);
+      } else if (type === "thisMonth") {
+        const d = new Date(today.getFullYear(), today.getMonth(), 1);
+        startStr = formatDateYMD(d);
+      } else if (type === "all") {
+        startStr = "";
+      }
+
+      document.getElementById("startDate").value = startStr;
+      document.getElementById("endDate").value = type === "all" ? "" : endStr;
+      setQuickDateHighlight(`qd-${type}`);
+      applyFilter();
+    }
+
+
+    
+
+    function exportToCsv() {
+      if (!lastFilteredData || lastFilteredData.length === 0) {
+        showToast("無可匯出的資料");
+        return;
+      }
+
+      let csvContent = "\﻿"; 
+      csvContent += displayHeaders.map(h => `"${h.replace(/"/g, '""')}"`).join(",") + "\
+";
+
+      lastFilteredData.forEach(item => {
+        const rowData = item.rawRow.map(cell => `"${String(cell || '').replace(/"/g, '""')}"`);
+        csvContent += rowData.join(",") + "\
+";
+      });
+
+      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.setAttribute("href", url);
+      link.setAttribute("download", `學生學習歷程_${currentUser || 'record'}_${formatDateYMD(new Date())}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+
+    // 輔助工具函式
+    function toIntSafe(v) {
+      if (!v) return 0;
+      const n = parseInt(String(v).replace(/,/g, "").trim(), 10);
+      return isNaN(n) ? 0 : n;
+    }
+
+    function parseRatio(s) {
+      if (s.includes("/")) {
+        const parts = s.split("/");
+        return { num: toIntSafe(parts[0]), den: toIntSafe(parts[1]) };
+      }
+      return { num: toIntSafe(s), den: 0 };
+    }
+
+    function escapeHtml(s) {
+      return String(s || "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    }
+
+    function formatSigned(n) {
+      return n > 0 ? `+${n}` : `${n}`;
+    }
+
+    function formatDateYMD(d) {
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    }
+  
+    /* ==========================================================================
+       👨‍👩‍👧 家長專區與今日任務指派中心核心腳本 (Parent Zone Core Logic)
+       ========================================================================== */
+    let WORDS_DB = [];
+    let WORDS_BY_ID = {};
+    let isWordBankLoaded = false;
+
+    let studentWrongWords = new Set();
+    let studentMasteredWords = new Set();
+    let studentPracticingWords = new Set();
+
+    let currentParentConfig = { active: false, wordIds: [], customWords: [], goal: 15 };
+    let currentParentMissions = [];
+
+    let selectedWordIds = new Set();
+    let customWordsList = [];
+
+    let currentDim = 'theme'; // 'theme' | 'az' | 'custom'
+    let currentTheme = 'all';
+    let currentAZ = 'ALL';
+    let currentLevel = 0; // 0 = all
+    let searchQuery = '';
+    let parentCurrentPage = 1;
+    let parentPageSize = 50;
+
+    const THEMES = [
+      { id: "all", name: "全部主題", icon: "🌐", rx: /.*/ },
+      { id: "animal", name: "🐶 動物生活", rx: /(cat|dog|bird|fish|lion|tiger|bear|duck|pig|horse|sheep|monkey|rabbit|elephant|snake|zoo|pet|mouse|frog|deer|cow|chicken|wolf|fox|insect|spider|whale|dolphin)/i },
+      { id: "food", name: "🍎 飲食健康", rx: /(apple|banana|food|bread|rice|meat|fruit|drink|tea|coffee|water|milk|juice|cake|cook|soup|egg|beef|pork|lunch|dinner|breakfast|sugar|salt|vegetable|hungry|thirsty|restaurant|eat|delicious|taste|salad|cheese|potato|tomato)/i },
+      { id: "school", name: "🏫 校園學習", rx: /(book|pen|pencil|desk|school|class|student|teacher|study|learn|lesson|read|write|test|exam|grade|math|history|science|music|art|homework|library|question|answer|paper|ruler|college|university)/i },
+      { id: "family", name: "🏠 家庭日常", rx: /(home|house|family|father|mother|brother|sister|parent|baby|child|son|daughter|room|bed|door|window|kitchen|sleep|wake|clean|wash|morning|night|table|chair|clock|floor|roof|garden)/i },
+      { id: "travel", name: "✈️ 交通旅遊", rx: /(car|bus|train|plane|ship|boat|bike|bicycle|drive|fly|walk|trip|travel|tour|station|airport|road|street|map|ticket|visit|hotel|country|city|town|world|arrive|leave|guide)/i },
+      { id: "sports", name: "⚽ 運動休閒", rx: /(game|play|ball|sport|run|jump|swim|walk|tennis|soccer|football|basketball|baseball|race|win|lose|match|movie|song|dance|party|fun|hobby|toy|guitar|piano|camp|hike)/i },
+      { id: "work", name: "💼 工作職業", rx: /(work|job|doctor|nurse|police|driver|worker|farmer|cook|office|business|company|boss|money|dollar|buy|sell|pay|price|market|shop|store|cost|rich|poor|bank|factory|lawyer)/i },
+      { id: "nature", name: "🌲 自然環境", rx: /(sun|moon|star|sky|earth|sea|ocean|river|lake|tree|flower|grass|plant|rain|snow|wind|cloud|weather|hot|cold|warm|cool|season|spring|summer|autumn|fall|winter|mountain|hill|forest)/i },
+      { id: "emotion", name: "🎨 情感感覺", rx: /(happy|sad|angry|afraid|scared|love|hate|like|fear|proud|glad|sorry|feel|feeling|hope|wish|dream|kind|nice|brave|smile|cry|laugh|tired|bored|excited|surprised)/i },
+      { id: "tech", name: "⚙️ 科技生活", rx: /(computer|phone|internet|online|screen|video|audio|digital|robot|machine|device|program|data|network|click|type|email|message|game|web|tech|system|code|smart)/i }
+    ];
+
+    const LETTERS = ["ALL", ..."ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("")];
+
+    function lvColor(lv) {
+      switch (lv) {
+        case 1: return '#10b981';
+        case 2: return '#3b82f6';
+        case 3: return '#8b5cf6';
+        case 4: return '#f59e0b';
+        case 5: return '#ef4444';
+        default: return '#6b7280';
+      }
+    }
+
+    // 🔊 發音播放
+    function sayWord(w, ev) {
+      if (ev) ev.stopPropagation();
+      if (!window.speechSynthesis) return;
+      window.speechSynthesis.cancel();
+      const u = new SpeechSynthesisUtterance(w);
+      u.lang = 'en-US';
+      u.rate = 0.9;
+      window.speechSynthesis.speak(u);
+    }
+
+    // 載入 2,055 單字庫與中文釋義
+    async function loadWordBankForDashboard() {
+      if (isWordBankLoaded && WORDS_DB.length > 0) return;
+      try {
+        const [wRes, mRes] = await Promise.all([
+          fetch("https://pmpu4000-stack.github.io/bad/data/words2000.json"),
+          fetch("https://pmpu4000-stack.github.io/bad/data/meanings.json").catch(() => null)
+        ]);
+        const rawWords = await wRes.json();
+        const meanings = mRes ? await mRes.json() : {};
+
+        WORDS_DB = rawWords.map((item, idx) => {
+          const id = String(item.id !== undefined ? item.id : idx);
+          const word = typeof item === 'string' ? item : item.word;
+          const level = typeof item === 'object' && item.level ? item.level : 1;
+          const zh = meanings[word] || (typeof item === 'object' ? item.meaning || '' : '');
+          return { id, word, level, meaning: zh };
+        });
+
+        WORDS_BY_ID = {};
+        WORDS_DB.forEach(w => {
+          WORDS_BY_ID[w.id] = w;
+          WORDS_BY_ID[w.word.toLowerCase()] = w;
+        });
+        isWordBankLoaded = true;
+      } catch (e) {
+        console.warn("Failed to fetch words from GitHub, using basic fallback:", e);
+        if (WORDS_DB.length === 0) {
+          const fallback = ["time","year","people","way","day","man","thing","woman","life","child","world","school","state","family","student","group","country","problem","hand","part","place","case","week","company","system","program","question","work","government","number","night","point","home","water","room","mother","area","money","story","fact","month","lot","right","study","book","eye","job","word","business","issue","side","kind","head","house","service","friend","father","power","hour","game","line","end","member","law","car","city","community","name","president","team","minute","idea","kid","body","information","back","parent","face","others","level","office","door","health","person","art","war","history","party","result","change","morning","reason","research","girl","guy","moment","air","teacher","force","education"];
+          WORDS_DB = fallback.map((w, idx) => ({ id: String(idx), word: w, level: 1, meaning: "" }));
+          WORDS_DB.forEach(w => { WORDS_BY_ID[w.id] = w; WORDS_BY_ID[w.word.toLowerCase()] = w; });
+        }
+      }
+    }
+
+    // 分析學生作答記錄 (曾錯字、精通字、練習中)
+    function analyzeStudentRecord(headers, data) {
+      studentWrongWords.clear();
+      studentMasteredWords.clear();
+      studentPracticingWords.clear();
+
+      const rawJsonCol = headers.indexOf("完整JSON");
+      if (rawJsonCol < 0 || !data || data.length === 0) return;
+
+      for (let i = data.length - 1; i >= 0; i--) {
+        const raw = data[i][rawJsonCol];
+        if (raw) {
+          try {
+            const parsed = JSON.parse(raw);
+            const spell = parsed["spellAgent.v2"] ? (typeof parsed["spellAgent.v2"] === 'string' ? JSON.parse(parsed["spellAgent.v2"]) : parsed["spellAgent.v2"]) : null;
+            if (spell) {
+              if (spell.stat) {
+                for (const [wId, st] of Object.entries(spell.stat)) {
+                  if (st && (st.ew > 0 || (st.a > st.c))) {
+                    studentWrongWords.add(String(wId));
+                  }
+                }
+              }
+              if (spell.box) {
+                for (const [wId, b] of Object.entries(spell.box)) {
+                  if (b === 3) studentMasteredWords.add(String(wId));
+                  else if (b === 1 || b === 2) studentPracticingWords.add(String(wId));
+                }
+              }
+              break;
+            }
+          } catch (e) {}
+        }
+      }
+    }
+
+    // 渲染今日任務指派中心卡片
+    function renderParentMissionCard() {
+      const badge = document.getElementById("pMissionStatusBadge");
+      const desc = document.getElementById("pMissionDesc");
+      const chipsWrap = document.getElementById("pMissionChipsWrap");
+      const chips = document.getElementById("pMissionChips");
+      const clearBtn = document.getElementById("btnClearParentMission");
+
+      const active = currentParentConfig && currentParentConfig.active && currentParentConfig.wordIds && currentParentConfig.wordIds.length > 0;
+
+      if (active) {
+        const totalWords = currentParentConfig.wordIds.length;
+        const goal = currentParentConfig.goal || totalWords;
+        badge.style.background = "rgba(139, 108, 240, 0.25)";
+        badge.style.color = "#caa7ff";
+        badge.style.borderColor = "#8b6cf0";
+        badge.innerHTML = `🎯 家長指定練習中 (共 ${totalWords} 字 · 目標 ${goal} 題)`;
+
+        desc.innerHTML = `學生登入後將直接進入家長指定題庫施測。已排定 <strong>${totalWords} 個單字</strong>，完成 <strong>${goal} 題</strong>後即達標！`;
+
+        chipsWrap.style.display = "block";
+        chips.innerHTML = currentParentConfig.wordIds.map(wId => {
+          const wObj = WORDS_BY_ID[String(wId)];
+          const text = wObj ? wObj.word : String(wId);
+          const zh = wObj && wObj.meaning ? ` · ${wObj.meaning}` : "";
+          return `<span class="parent-chip">
+            <strong>${escapeHtml(text)}</strong><span style="font-size:11px;color:#94a3b8;">${escapeHtml(zh)}</span>
+            <span style="cursor:pointer;" onclick="sayWord('${text}', event)" title="發音">🔊</span>
+          </span>`;
+        }).join("");
+
+        clearBtn.style.display = "inline-flex";
+      } else {
+        badge.style.background = "#252840";
+        badge.style.color = "#cbd5e1";
+        badge.style.borderColor = "#3d4166";
+        badge.innerHTML = "💡 系統自適應出題中";
+
+        desc.innerHTML = "目前學生登入遊戲時由系統自適應出題。家長可點擊下方按鈕，從 2000 單字庫中挑選或貼上小考單字，指定學生「開始今天的練習」的施測範圍：";
+
+        chipsWrap.style.display = "none";
+        chips.innerHTML = "";
+        clearBtn.style.display = "none";
+      }
+    }
+
+    // 渲染最近一次家長指定任務施測成果卡片
+    function renderParentResultsCard() {
+      const dateBadge = document.getElementById("pResultDateBadge");
+      const summaryRow = document.getElementById("pResultSummaryRow");
+      const wordList = document.getElementById("pResultWordList");
+
+      if (!currentParentMissions || currentParentMissions.length === 0) {
+        dateBadge.textContent = "尚無指定測驗紀錄";
+        summaryRow.innerHTML = `<span style="color:#94a3b8; font-weight:normal;">目前學生尚無完成家長指定任務的測驗紀錄。只要在上方指派任務，學生完成施測後成果將自動呈現在此。</span>`;
+        wordList.innerHTML = "";
+        return;
+      }
+
+      const latest = currentParentMissions[0];
+      dateBadge.textContent = `📅 最近施測：${latest.time || latest.date}`;
+
+      const rateColor = latest.rate >= 80 ? "#22c55e" : (latest.rate < 50 ? "#ef4444" : "#eab308");
+      summaryRow.innerHTML = `
+        <div style="background:rgba(255,255,255,0.05); padding:6px 14px; border-radius:8px;">作答題數：<span style="color:#fff;">${latest.answered} 題</span></div>
+        <div style="background:rgba(34,197,94,0.15); padding:6px 14px; border-radius:8px; color:#4ade80;">答對：<span>${latest.correct} 題</span></div>
+        <div style="background:rgba(239,68,68,0.15); padding:6px 14px; border-radius:8px; color:#f87171;">曾拼錯：<span>${latest.incorrect} 題</span></div>
+        <div style="background:rgba(139,108,240,0.15); padding:6px 14px; border-radius:8px; color:${rateColor};">正確率：<span>${latest.rate}%</span></div>
+      `;
+
+      if (latest.wordIds && latest.wordIds.length > 0) {
+        wordList.innerHTML = latest.wordIds.map(wId => {
+          const wObj = WORDS_BY_ID[String(wId)];
+          const wordText = wObj ? wObj.word : String(wId);
+          const zh = wObj && wObj.meaning ? wObj.meaning : "";
+          const lv = wObj ? wObj.level : 1;
+
+          const res = latest.idsResult ? latest.idsResult[String(wId)] : null;
+          let statusBadge = `<span class="badge" style="background:#64748b; color:#fff; font-size:11px; padding:2px 7px; border-radius:4px;">⏳ 待測驗</span>`;
+          if (res) {
+            if (res.w > 0) {
+              statusBadge = `<span class="badge" style="background:#ef4444; color:#fff; font-size:11px; padding:2px 7px; border-radius:4px;">❌ 曾拼錯 (${res.w}次)</span>`;
+            } else if (res.c > 0) {
+              statusBadge = `<span class="badge" style="background:#22c55e; color:#fff; font-size:11px; padding:2px 7px; border-radius:4px;">✅ 答對</span>`;
+            }
+          } else if (studentWrongWords.has(String(wId))) {
+            statusBadge = `<span class="badge" style="background:#f97316; color:#fff; font-size:11px; padding:2px 7px; border-radius:4px;">⚠️ 歷史曾錯</span>`;
+          } else if (studentMasteredWords.has(String(wId))) {
+            statusBadge = `<span class="badge" style="background:#10b981; color:#fff; font-size:11px; padding:2px 7px; border-radius:4px;">⭐ 已精通</span>`;
+          }
+
+          return `<div class="p-res-item">
+            <span style="font-weight:800; font-size:14px; color:#fff; min-width:110px;">${escapeHtml(wordText)}</span>
+            <span class="p-w-lv" style="background:${lvColor(lv)}; font-size:10.5px; padding:2px 6px; border-radius:4px;">L${lv}</span>
+            <span style="font-size:12.5px; color:#94a3b8; flex:1;">${escapeHtml(zh)}</span>
+            <button class="parent-tool-btn" onclick="sayWord('${wordText}', event)" title="播放發音" style="padding:2px 8px;">🔊 發音</button>
+            ${statusBadge}
+          </div>`;
+        }).join("");
+      } else {
+        wordList.innerHTML = `<div style="color:#94a3b8; font-size:13px;">該次任務無指定單字列表</div>`;
+      }
+    }
+
+    // 打開選字彈窗
+    async function openParentModal() {
+      const modal = document.getElementById("parentModal");
+      modal.style.display = "flex";
+
+      // 載入字庫
+      if (!isWordBankLoaded || WORDS_DB.length === 0) {
+        await loadWordBankForDashboard();
+      }
+
+      // 初始化已選單字
+      selectedWordIds = new Set(
+        (currentParentConfig && currentParentConfig.active && currentParentConfig.wordIds)
+          ? currentParentConfig.wordIds.map(String)
+          : []
+      );
+      customWordsList = (currentParentConfig && currentParentConfig.customWords) ? [...currentParentConfig.customWords] : [];
+
+      // 設定目標題數
+      const goalInput = document.getElementById("parentGoalInput");
+      if (goalInput) {
+        goalInput.value = (currentParentConfig && currentParentConfig.goal) ? currentParentConfig.goal : Math.max(10, Math.min(25, selectedWordIds.size || 15));
+      }
+
+      // 初始化工具條
+      renderThemesBar();
+      renderAzBar();
+      renderSelectedChips();
+      renderWordList();
+    }
+
+    function closeParentModal() {
+      const modal = document.getElementById("parentModal");
+      if (modal) modal.style.display = "none";
+    }
+
+    // 切換維度 (theme / az / custom)
+    function switchDim(dim) {
+      currentDim = dim;
+      document.getElementById("dim-theme").classList.toggle("active", dim === 'theme');
+      document.getElementById("dim-az").classList.toggle("active", dim === 'az');
+      document.getElementById("dim-custom").classList.toggle("active", dim === 'custom');
+
+      document.getElementById("themeBarContainer").style.display = dim === 'theme' ? 'flex' : 'none';
+      document.getElementById("azBarContainer").style.display = dim === 'az' ? 'flex' : 'none';
+      document.getElementById("customWordContainer").style.display = dim === 'custom' ? 'flex' : 'none';
+
+      parentCurrentPage = 1;
+      renderWordList();
+    }
+
+    function renderThemesBar() {
+      const container = document.getElementById("themeBarContainer");
+      if (!container) return;
+      container.innerHTML = THEMES.map(t => {
+        const active = t.id === currentTheme ? 'active' : '';
+        return `<button class="theme-chip ${active}" onclick="setTheme('${t.id}')">${escapeHtml(t.name)}</button>`;
+      }).join("");
+    }
+
+    function setTheme(tId) {
+      currentTheme = tId;
+      renderThemesBar();
+      parentCurrentPage = 1;
+      renderWordList();
+    }
+
+    function renderAzBar() {
+      const container = document.getElementById("azBarContainer");
+      if (!container) return;
+      container.innerHTML = LETTERS.map(l => {
+        const active = l === currentAZ ? 'active' : '';
+        return `<button class="az-chip ${active}" onclick="setAZ('${l}')">${l}</button>`;
+      }).join("");
+    }
+
+    function setAZ(letter) {
+      currentAZ = letter;
+      renderAzBar();
+      parentCurrentPage = 1;
+      renderWordList();
+    }
+
+    function setLevelFilter(lvl) {
+      currentLevel = lvl;
+      for (let i = 0; i <= 5; i++) {
+        const btn = document.getElementById(`lv-btn-${i}`);
+        if (btn) btn.classList.toggle("active", i === lvl);
+      }
+      parentCurrentPage = 1;
+      renderWordList();
+    }
+
+    function changePageSize(sz) {
+      parentPageSize = parseInt(sz, 10) || 50;
+      parentCurrentPage = 1;
+      renderWordList();
+    }
+
+    function changePage(delta) {
+      parentCurrentPage += delta;
+      renderWordList();
+    }
+
+    function onSearchChange(val) {
+      searchQuery = (val || "").trim().toLowerCase();
+      document.getElementById("searchClearBtn").style.display = searchQuery ? "block" : "none";
+      parentCurrentPage = 1;
+      renderWordList();
+    }
+
+    function clearSearch() {
+      const input = document.getElementById("parentSearchInput");
+      if (input) input.value = "";
+      onSearchChange("");
+    }
+
+    // 篩選單字
+    function getFilteredWords() {
+      if (!WORDS_DB || WORDS_DB.length === 0) return [];
+
+      let list = WORDS_DB;
+
+      // 等級篩選
+      if (currentLevel > 0) {
+        list = list.filter(w => w.level === currentLevel);
+      }
+
+      // 維度篩選
+      if (currentDim === 'theme' && currentTheme !== 'all') {
+        const themeObj = THEMES.find(t => t.id === currentTheme);
+        if (themeObj && themeObj.rx) {
+          list = list.filter(w => themeObj.rx.test(w.word));
+        }
+      } else if (currentDim === 'az' && currentAZ !== 'ALL') {
+        list = list.filter(w => w.word.toUpperCase().startsWith(currentAZ));
+      }
+
+      // 搜尋關鍵字
+      if (searchQuery) {
+        list = list.filter(w => w.word.toLowerCase().includes(searchQuery) || (w.meaning && w.meaning.includes(searchQuery)));
+      }
+
+      return list;
+    }
+
+    // 渲染單字清單
+    function renderWordList() {
+      const listContainer = document.getElementById("parentWordList");
+      const counterText = document.getElementById("listCounterText");
+      const pageInfo = document.getElementById("pageInfoText");
+      const pageNumDisplay = document.getElementById("pageNumDisplay");
+      const prevBtn = document.getElementById("btnPrevPage");
+      const nextBtn = document.getElementById("btnNextPage");
+
+      const filtered = getFilteredWords();
+      const total = filtered.length;
+      const totalPages = Math.max(1, Math.ceil(total / parentPageSize));
+
+      if (parentCurrentPage < 1) parentCurrentPage = 1;
+      if (parentCurrentPage > totalPages) parentCurrentPage = totalPages;
+
+      counterText.textContent = `符合條件：共 ${total} 字`;
+      pageInfo.textContent = `第 ${parentCurrentPage} / ${totalPages} 頁 (共 ${total} 字)`;
+      pageNumDisplay.textContent = `${parentCurrentPage}`;
+      prevBtn.disabled = parentCurrentPage <= 1;
+      nextBtn.disabled = parentCurrentPage >= totalPages;
+
+      const start = (parentCurrentPage - 1) * parentPageSize;
+      const end = Math.min(start + parentPageSize, total);
+      const pageSlice = filtered.slice(start, end);
+
+      if (pageSlice.length === 0) {
+        listContainer.innerHTML = `<div style="text-align:center; padding:40px; color:#94a3b8;">無符合篩選條件的單字</div>`;
+        return;
+      }
+
+      listContainer.innerHTML = pageSlice.map(w => {
+        const isChecked = selectedWordIds.has(String(w.id));
+        let badgeHtml = '';
+        if (studentWrongWords.has(String(w.id))) {
+          badgeHtml = `<span class="badge" style="background:#ef4444; color:#fff; font-size:10px; padding:1px 5px; border-radius:4px;">⚠️ 曾拼錯</span>`;
+        } else if (studentMasteredWords.has(String(w.id))) {
+          badgeHtml = `<span class="badge" style="background:#10b981; color:#fff; font-size:10px; padding:1px 5px; border-radius:4px;">⭐ 精通</span>`;
+        } else if (studentPracticingWords.has(String(w.id))) {
+          badgeHtml = `<span class="badge" style="background:#3b82f6; color:#fff; font-size:10px; padding:1px 5px; border-radius:4px;">📖 練習中</span>`;
+        }
+
+        return `
+          <div class="parent-word-item" onclick="toggleWordSelection('${w.id}')">
+            <input type="checkbox" ${isChecked ? 'checked' : ''} onclick="event.stopPropagation(); toggleWordSelection('${w.id}')">
+            <span class="p-w-text">${escapeHtml(w.word)}</span>
+            <span class="p-w-lv" style="background:${lvColor(w.level)}">L${w.level}</span>
+            <span class="p-w-zh">${escapeHtml(w.meaning)}</span>
+            <button class="p-w-speak" onclick="sayWord('${w.word}', event)" title="發音">🔊</button>
+            <div class="p-w-badge">${badgeHtml}</div>
+          </div>
+        `;
+      }).join("");
+    }
+
+    // 勾選/取消單字
+    function toggleWordSelection(wId) {
+      const idStr = String(wId);
+      if (selectedWordIds.has(idStr)) {
+        selectedWordIds.delete(idStr);
+      } else {
+        selectedWordIds.add(idStr);
+      }
+      renderSelectedChips();
+      renderWordList();
+    }
+
+    // 全選/取消本頁
+    function selectCurrentPage(select) {
+      const filtered = getFilteredWords();
+      const start = (parentCurrentPage - 1) * parentPageSize;
+      const end = Math.min(start + parentPageSize, filtered.length);
+      const pageSlice = filtered.slice(start, end);
+
+      pageSlice.forEach(w => {
+        if (select) selectedWordIds.add(String(w.id));
+        else selectedWordIds.delete(String(w.id));
+      });
+
+      renderSelectedChips();
+      renderWordList();
+    }
+
+    // 清空選擇
+    function clearSelection() {
+      selectedWordIds.clear();
+      customWordsList = [];
+      renderSelectedChips();
+      renderWordList();
+    }
+
+    // 渲染已勾選單字標籤列
+    function renderSelectedChips() {
+      const container = document.getElementById("selectedChipsBar");
+      const countText = document.getElementById("selectedCountText");
+      const count = selectedWordIds.size;
+
+      countText.textContent = `已選取 ${count} 個單字（建議每次設定 10 ~ 25 字）`;
+
+      if (count === 0) {
+        container.innerHTML = `<span style="font-size:12px; color:#64748b;">尚未勾選任何單字</span>`;
+        return;
+      }
+
+      const arr = Array.from(selectedWordIds);
+      container.innerHTML = arr.map(wId => {
+        const wObj = WORDS_BY_ID[String(wId)];
+        const text = wObj ? wObj.word : String(wId);
+        return `
+          <span class="parent-chip">
+            <span>${escapeHtml(text)}</span>
+            <span style="cursor:pointer;" onclick="sayWord('${text}', event)" title="發音">🔊</span>
+            <span class="rm" onclick="toggleWordSelection('${wId}')" title="移除">✕</span>
+          </span>
+        `;
+      }).join("");
+    }
+
+    // 智慧推薦 15 字 (優先曾錯字 -> 練習中 -> 未精通字)
+    function smartRecommend(n = 15) {
+      selectedWordIds.clear();
+      const pool = [];
+
+      // 1. 曾拼錯單字
+      for (const id of studentWrongWords) {
+        if (pool.length < n) pool.push(id);
+      }
+
+      // 2. 練習中單字
+      for (const id of studentPracticingWords) {
+        if (pool.length < n && !pool.includes(id)) pool.push(id);
+      }
+
+      // 3. 尚未精通單字
+      for (const w of WORDS_DB) {
+        if (pool.length < n && !studentMasteredWords.has(w.id) && !pool.includes(w.id)) {
+          pool.push(w.id);
+        }
+      }
+
+      pool.forEach(id => selectedWordIds.add(id));
+      const goalInput = document.getElementById("parentGoalInput");
+      if (goalInput) goalInput.value = pool.length;
+
+      renderSelectedChips();
+      renderWordList();
+      showToast(`⚡ 智慧推薦已選入 ${pool.length} 個高優先學習單字！`);
+    }
+
+    // 一鍵加入所有曾錯字
+    function addAllWrongToSelection() {
+      if (studentWrongWords.size === 0) {
+        showToast("學生目前沒有歷史拼錯紀錄！");
+        return;
+      }
+      studentWrongWords.forEach(id => selectedWordIds.add(id));
+      const goalInput = document.getElementById("parentGoalInput");
+      if (goalInput) goalInput.value = selectedWordIds.size;
+
+      renderSelectedChips();
+      renderWordList();
+      showToast(`⚠️ 已加入全部 ${studentWrongWords.size} 個曾錯單字！`);
+    }
+
+    // 解析並加入自訂單字
+    function parseAndAddCustomWords() {
+      const textarea = document.getElementById("customWordInput");
+      const val = (textarea ? textarea.value : "").trim();
+      if (!val) {
+        showToast("請先輸入或貼上單字！");
+        return;
+      }
+
+      const tokens = val.split(/[\s,;\n\r]+/).map(t => t.trim().toLowerCase()).filter(Boolean);
+      let matchedCount = 0;
+      let newCount = 0;
+
+      tokens.forEach(tok => {
+        if (WORDS_BY_ID[tok]) {
+          selectedWordIds.add(String(WORDS_BY_ID[tok].id));
+          matchedCount++;
+        } else {
+          // 自訂單字
+          if (!customWordsList.some(cw => cw.word.toLowerCase() === tok)) {
+            customWordsList.push({ id: `c_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`, word: tok, level: 1 });
+            newCount++;
+          }
+        }
+      });
+
+      renderSelectedChips();
+      renderWordList();
+      showToast(`已成功加入 ${matchedCount + newCount} 個單字（其中字庫符合 ${matchedCount}，自訂 ${newCount}）`);
+      if (textarea) textarea.value = "";
+    }
+
+    // 儲存並指派給學生
+    function saveParentMission() {
+      if (selectedWordIds.size === 0 && customWordsList.length === 0) {
+        showToast("請至少勾選或新增 1 個單字！");
+        return;
+      }
+
+      const goalInput = document.getElementById("parentGoalInput");
+      const goal = parseInt(goalInput ? goalInput.value : 15, 10) || 15;
+      const statusSpan = document.getElementById("parentSaveStatus");
+      const saveBtn = document.getElementById("btnSaveParentMission");
+
+      const newConfig = {
+        active: true,
+        wordIds: Array.from(selectedWordIds),
+        customWords: customWordsList,
+        goal: goal
+      };
+
+      if (saveBtn) { saveBtn.disabled = true; saveBtn.innerHTML = "⏳ 儲存中..."; }
+      if (statusSpan) statusSpan.textContent = "正在同步到雲端試算表...";
+
+      const handleSuccess = function(resp) {
+        if (saveBtn) { saveBtn.disabled = false; saveBtn.innerHTML = "💾 儲存並指派給學生"; }
+        if (statusSpan) statusSpan.textContent = "";
+
+        if (resp && resp.status === "success") {
+          currentParentConfig = newConfig;
+          renderParentMissionCard();
+          closeParentModal();
+          showToast("🎉 家長指定單字已成功儲存！學生登入時將優先施測這些單字。");
+        } else {
+          showToast("儲存失敗：" + ((resp && resp.message) ? resp.message : "未知錯誤"));
+        }
+      };
+
+      const handleFailure = function(err) {
+        if (saveBtn) { saveBtn.disabled = false; saveBtn.innerHTML = "💾 儲存並指派給學生"; }
+        if (statusSpan) statusSpan.textContent = "";
+        showToast("連線失敗：" + (err.message || err));
+      };
+
+      if (typeof google !== "undefined" && google.script && google.script.run) {
+        google.script.run
+          .withSuccessHandler(handleSuccess)
+          .withFailureHandler(handleFailure)
+          .saveParentConfig({ username: currentUser, parentConfig: newConfig });
+      } else {
+        // Fallback fetch
+        fetch(window.location.href, {
+          method: "POST",
+          headers: { "Content-Type": "text/plain;charset=utf-8" },
+          body: JSON.stringify({ action: "saveParentConfig", username: currentUser, parentConfig: newConfig })
+        })
+        .then(r => r.json())
+        .then(handleSuccess)
+        .catch(handleFailure);
+      }
+    }
+
+    // 取消指定任務 (恢復系統自適應出題)
+    function clearParentMission() {
+      if (!confirm("確定要取消家長指定單字，恢復為系統自適應出題嗎？")) return;
+
+      const emptyConfig = { active: false, wordIds: [], customWords: [], goal: 0 };
+
+      const handleSuccess = function(resp) {
+        if (resp && resp.status === "success") {
+          currentParentConfig = emptyConfig;
+          renderParentMissionCard();
+          showToast("🔄 已取消家長指定，恢復系統自適應出題模式。");
+        } else {
+          showToast("更新失敗：" + ((resp && resp.message) ? resp.message : "未知錯誤"));
+        }
+      };
+
+      if (typeof google !== "undefined" && google.script && google.script.run) {
+        google.script.run
+          .withSuccessHandler(handleSuccess)
+          .withFailureHandler(function(err) { showToast("連線失敗：" + (err.message || err)); })
+          .saveParentConfig({ username: currentUser, parentConfig: emptyConfig });
+      } else {
+        fetch(window.location.href, {
+          method: "POST",
+          headers: { "Content-Type": "text/plain;charset=utf-8" },
+          body: JSON.stringify({ action: "saveParentConfig", username: currentUser, parentConfig: emptyConfig })
+        })
+        .then(r => r.json())
+        .then(handleSuccess);
+      }
+    }
+
+    // 儀表板卡片上的一鍵指派曾錯字特訓按鈕
+    function quickAssignAllWrong() {
+      if (studentWrongWords.size === 0) {
+        showToast("學生目前沒有歷史拼錯單字，太棒了！");
+        return;
+      }
+
+      if (!confirm(`確定要將學生歷史累積的全部 ${studentWrongWords.size} 個曾錯單字指派為今日練習任務嗎？`)) return;
+
+      const wrongIds = Array.from(studentWrongWords);
+      const newConfig = {
+        active: true,
+        wordIds: wrongIds,
+        customWords: [],
+        goal: wrongIds.length
+      };
+
+      const handleSuccess = function(resp) {
+        if (resp && resp.status === "success") {
+          currentParentConfig = newConfig;
+          renderParentMissionCard();
+          showToast(`⚠️ 已成功將全部 ${wrongIds.length} 個曾錯字指派為今日專屬特訓任務！`);
+        } else {
+          showToast("指派失敗：" + ((resp && resp.message) ? resp.message : "未知錯誤"));
+        }
+      };
+
+      if (typeof google !== "undefined" && google.script && google.script.run) {
+        google.script.run
+          .withSuccessHandler(handleSuccess)
+          .withFailureHandler(function(err) { showToast("連線失敗：" + (err.message || err)); })
+          .saveParentConfig({ username: currentUser, parentConfig: newConfig });
+      } else {
+        fetch(window.location.href, {
+          method: "POST",
+          headers: { "Content-Type": "text/plain;charset=utf-8" },
+          body: JSON.stringify({ action: "saveParentConfig", username: currentUser, parentConfig: newConfig })
+        })
+        .then(r => r.json())
+        .then(handleSuccess);
+      }
+    }
+
+  </script>
+
+  <!-- 🎯 2,055 單字庫家長選字與指派彈窗 -->
+  <div id="parentModal" class="parent-modal-overlay" style="display:none;" onclick="if(event.target===this)closeParentModal()">
+    <div class="parent-dialog">
+      <!-- Header -->
+      <div class="parent-head">
+        <div class="parent-title">
+          <span>🎯 家長指定今日練習單字</span>
+          <span class="parent-badge">2,055 字庫</span>
+        </div>
+        <button class="parent-close" onclick="closeParentModal()" title="關閉">&times;</button>
+      </div>
+
+      <!-- Body -->
+      <div class="parent-body">
+        <!-- 頂部功能：主題分類 / A-Z 索引 / 自訂貼上 + 智慧推薦快捷 -->
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+          <div class="parent-dims">
+            <button class="dim-btn active" id="dim-theme" onclick="switchDim('theme')">📚 10 大主題</button>
+            <button class="dim-btn" id="dim-az" onclick="switchDim('az')">🔤 A-Z 字母索引</button>
+            <button class="dim-btn" id="dim-custom" onclick="switchDim('custom')">📝 貼上學校段考單字</button>
+          </div>
+
+          <div class="parent-presets">
+            <button class="preset-btn highlight" onclick="smartRecommend(15)" title="綜合推薦15字：優先錯字、練習中與未精通字">
+              ⚡ 智慧推薦 15 字
+            </button>
+            <button class="preset-btn highlight" onclick="addAllWrongToSelection()" title="將所有歷史曾錯字加入選單">
+              ⚠️ 加入所有曾錯字
+            </button>
+            <button class="preset-btn" onclick="clearSelection()" title="清空目前所有勾選單字">
+              🧹 清空已選
+            </button>
+          </div>
+        </div>
+
+        <!-- 10 大主題選擇條 (當 theme 模式時顯示) -->
+        <div id="themeBarContainer" class="parent-theme-bar"></div>
+
+        <!-- A-Z 字母索引條 (當 az 模式時顯示) -->
+        <div id="azBarContainer" class="parent-az-bar" style="display:none;"></div>
+
+        <!-- 自訂貼上單字區 (當 custom 模式時顯示) -->
+        <div id="customWordContainer" class="parent-custom-area" style="display:none;">
+          <div style="font-size:12.5px; color:#cbd5e1; line-height:1.5;">
+            💡 貼上學校段考、英文小考或課文單字，以逗號、空格或換行分隔：
+          </div>
+          <textarea id="customWordInput" class="parent-textarea" placeholder="例如：
+apple, banana, orange
+elephant
+computer program technology"></textarea>
+          <div style="display:flex; justify-content:flex-end; gap:8px;">
+            <button class="btn btn-secondary btn-sm" onclick="parseAndAddCustomWords()">➕ 解析並加入選擇清單</button>
+          </div>
+        </div>
+
+        <!-- 等級過濾 + 搜尋框 + 分頁容量 (字庫模式) -->
+        <div id="wordFilterContainer" style="display:flex; flex-direction:column; gap:8px;">
+          <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; justify-content:space-between;">
+            <div class="parent-filter-row" id="levelChipsContainer">
+              <button class="parent-lv-chip active" id="lv-btn-0" onclick="setLevelFilter(0)">全部等級</button>
+              <button class="parent-lv-chip" id="lv-btn-1" onclick="setLevelFilter(1)">L1 入門</button>
+              <button class="parent-lv-chip" id="lv-btn-2" onclick="setLevelFilter(2)">L2 基礎</button>
+              <button class="parent-lv-chip" id="lv-btn-3" onclick="setLevelFilter(3)">L3 進階</button>
+              <button class="parent-lv-chip" id="lv-btn-4" onclick="setLevelFilter(4)">L4 挑戰</button>
+              <button class="parent-lv-chip" id="lv-btn-5" onclick="setLevelFilter(5)">L5 精熟</button>
+            </div>
+
+            <div style="display:flex; align-items:center; gap:6px;">
+              <span style="font-size:12px; color:#94a3b8;">每頁:</span>
+              <select class="page-select" id="parentPageSizeSelect" onchange="changePageSize(this.value)">
+                <option value="50">50 字</option>
+                <option value="100">100 字</option>
+                <option value="200">200 字</option>
+                <option value="9999">全部顯示</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="parent-search-row">
+            <input type="text" id="parentSearchInput" class="parent-search-input" placeholder="🔍 搜尋英文單字或中文釋義 (即時篩選)..." oninput="onSearchChange(this.value)">
+            <button class="search-clear-btn" id="searchClearBtn" onclick="clearSearch()" style="display:none;">✕</button>
+          </div>
+
+          <div class="parent-list-tools">
+            <span id="listCounterText">載入中...</span>
+            <div>
+              <button class="parent-tool-btn" onclick="selectCurrentPage(true)">全選本頁</button>
+              <button class="parent-tool-btn" onclick="selectCurrentPage(false)">取消本頁</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 單字清單捲動容器 -->
+        <div id="parentWordList" class="parent-word-list">
+          <div style="text-align:center; padding:30px; color:#94a3b8;">正在準備 2,055 單字庫...</div>
+        </div>
+
+        <!-- 分頁控制條 -->
+        <div id="parentPaginationBar" class="parent-pagination">
+          <span id="pageInfoText">第 1 / 1 頁</span>
+          <div class="page-btn-group">
+            <button class="page-btn" id="btnPrevPage" onclick="changePage(-1)">&lt; 上一頁</button>
+            <span id="pageNumDisplay" style="padding:0 6px;">1</span>
+            <button class="page-btn" id="btnNextPage" onclick="changePage(1)">下一頁 &gt;</button>
+          </div>
+        </div>
+
+        <!-- 已勾選單字摘要 -->
+        <div class="parent-selected-box">
+          <div class="parent-selected-title">
+            <span id="selectedCountText">已選取 0 個單字（建議每次設定 10 ~ 25 字）</span>
+            <span style="cursor:pointer; color:#f87171;" onclick="clearSelection()">清空</span>
+          </div>
+          <div id="selectedChipsBar" class="parent-chips-bar">
+            <span style="font-size:12px; color:#64748b;">尚未勾選任何單字</span>
+          </div>
+        </div>
+
+        <!-- 今日測驗目標題數設定 -->
+        <div class="parent-goal-row">
+          <span>🎯 今日測驗目標題數：</span>
+          <input type="number" id="parentGoalInput" class="parent-goal-input" min="5" max="100" value="15">
+          <span style="font-size:12px; color:#64748b;">（學生完成此題數後即視為達標完成今日家長任務）</span>
+        </div>
+      </div>
+
+      <!-- Footer -->
+      <div class="parent-foot">
+        <span id="parentSaveStatus" style="font-size:12px; color:#94a3b8; margin-right:auto;"></span>
+        <button class="btn btn-secondary" onclick="closeParentModal()">取消</button>
+        <button class="btn" id="btnSaveParentMission" onclick="saveParentMission()" style="background:#8b6cf0; color:#fff; font-weight:700;">
+          💾 儲存並指派給學生
+        </button>
+      </div>
+    </div>
+  </div>
+
+</body>
+</html>
