@@ -71,17 +71,66 @@ function openParentModal() {
   });
 }
 
+function getSummaryData() {
+  const sum = store.summary(WORDS);
+  const everWrongIds = store.getEverWrongWordIds();
+  const everWrongWords = WORDS.filter((w) => everWrongIds.includes(w.id));
+  return {
+    ...sum,
+    words: WORDS,
+    wordsMap: new Map(WORDS.map((w) => [w.id, w])),
+    everWrongIds,
+    everWrongWords,
+    parentConfig: store.getParentConfig(),
+  };
+}
+
+function getSummaryCallbacks() {
+  return {
+    onOpenParentConfig: openParentModal,
+    onClearParentConfig: () => {
+      store.clearParentConfig();
+      refreshChrome();
+      newRound();
+    },
+    onQuickAssignWrong: () => {
+      const wrongIds = store.getEverWrongWordIds();
+      if (!wrongIds.length) {
+        alert("目前沒有拼錯的紀錄，太棒了！");
+        return;
+      }
+      store.setParentConfig({
+        active: true,
+        wordIds: wrongIds,
+        customWords: [],
+        goal: wrongIds.length,
+      });
+      refreshChrome();
+      newRound();
+      alert(`已成功將全部 ${wrongIds.length} 個曾拼錯字指派為今日專屬特訓任務！`);
+    },
+    onQuickAssignLevel: (lvl) => {
+      const levelWords = WORDS.filter((w) => w.level === lvl);
+      if (!levelWords.length) return;
+      const ids = levelWords.map((w) => w.id);
+      store.setParentConfig({
+        active: true,
+        wordIds: ids,
+        customWords: [],
+        goal: Math.min(20, ids.length),
+      });
+      refreshChrome();
+      newRound();
+      alert(`已將 Level ${lvl}（共 ${ids.length} 字）設定為今日練習單字庫，目標 20 題！`);
+    },
+  };
+}
+
 // Repaint the level bar, header stats, and the gate banner.
 function refreshChrome() {
   ui.renderSession(store.sessionState(), DAILY_GOAL, {
     onStart: onSessionStart,
     onEnd: onSessionEnd,
-    onOpenParentConfig: openParentModal,
-    onToggleParentMode: (active) => {
-      store.setParentActive(active);
-      refreshChrome();
-      newRound();
-    },
     parentConfig: store.getParentConfig(),
   });
   ui.renderProgress(store.stats(WORDS));
@@ -94,7 +143,7 @@ function refreshChrome() {
   else if (ls.attempts < GATE_MIN_ATTEMPTS) hint = `再練習 ${GATE_MIN_ATTEMPTS - ls.attempts} 題（正確率保持 ≥80%）就能挑戰。`;
   else hint = "正確率再高一點（需 ≥80%）就能挑戰本關。";
   ui.renderBanner(cur, ls, ready, hint, startChallenge);
-  if (!ui.summaryHidden()) ui.renderSummary(store.summary(WORDS));
+  if (!ui.summaryHidden()) ui.renderSummary(getSummaryData(), getSummaryCallbacks());
 }
 
 function renderCurrent() {
@@ -244,7 +293,7 @@ ui.initModes(state.mode, (mode) => { state.mode = mode; state.answered = false; 
 ui.onCheckClick(check);
 ui.onPeek(() => { if (state.word) ui.peek(state.word); });
 ui.onReset(() => { if (confirm("確定要清除所有進度嗎？（會重新測程度）")) { store.reset(); startPlacement(); } });
-ui.onSummary(() => ui.toggleSummary(store.summary(WORDS)));
+ui.onSummary(() => ui.toggleSummary(getSummaryData(), getSummaryCallbacks()));
 ui.onPlace(() => startPlacement());
 
 // ---- boot ----

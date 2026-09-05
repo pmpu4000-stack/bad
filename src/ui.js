@@ -269,7 +269,7 @@ export function renderProgress(s) {
 }
 
 export function renderSession(s, defaultGoal, callbacks = {}) {
-  const { onStart, onEnd, onOpenParentConfig, onToggleParentMode, parentConfig } = callbacks;
+  const { onStart, onEnd, parentConfig } = callbacks;
   const hasParentWords = parentConfig && (
     (parentConfig.wordIds && parentConfig.wordIds.length > 0) ||
     (parentConfig.customWords && parentConfig.customWords.length > 0)
@@ -284,29 +284,16 @@ export function renderSession(s, defaultGoal, callbacks = {}) {
       el.session.innerHTML = `<div class="sess-idle">
         <div class="sess-title">
           今日練習 <span>Today's Session</span>
-          <span class="sess-parent-tag">👨‍👩‍👧 家長指定 (${parentCount} 字)</span>
+          <span class="sess-parent-tag">🌟 家長專屬任務 (${parentCount} 題)</span>
         </div>
-        <div class="sess-btn-group">
-          <button class="sess-btn-parent" id="sessParentEdit">⚙️ 調整單字</button>
-          <button class="sess-btn-toggle" id="sessParentToggle" title="切換為一般等級練習">切換等級練習</button>
-          <button class="sess-start" id="sessStart">▶️ 開始指定練習</button>
-        </div>
+        <button class="sess-start" id="sessStart">▶️ 開始專屬練習</button>
       </div>`;
-      if ($("#sessParentEdit")) $("#sessParentEdit").onclick = onOpenParentConfig;
-      if ($("#sessParentToggle")) $("#sessParentToggle").onclick = () => onToggleParentMode(false);
       $("#sessStart").onclick = () => onStart({ isParent: true });
     } else {
-      const toggleBtn = hasParentWords ? `<button class="sess-btn-toggle" id="sessParentToggle" title="切換為家長指定單字模式">使用家長清單 (${parentCount}字)</button>` : "";
       el.session.innerHTML = `<div class="sess-idle">
         <div class="sess-title">今日練習 <span>Today's Session</span></div>
-        <div class="sess-btn-group">
-          <button class="sess-btn-parent" id="sessParentSetup">👨‍👩‍👧 家長挑選與設定單字</button>
-          ${toggleBtn}
-          <button class="sess-start" id="sessStart">▶️ 開始今天的練習</button>
-        </div>
+        <button class="sess-start" id="sessStart">▶️ 開始今天的練習</button>
       </div>`;
-      if ($("#sessParentSetup")) $("#sessParentSetup").onclick = onOpenParentConfig;
-      if ($("#sessParentToggle")) $("#sessParentToggle").onclick = () => onToggleParentMode(true);
       $("#sessStart").onclick = () => onStart({ isParent: false });
     }
     return;
@@ -318,7 +305,7 @@ export function renderSession(s, defaultGoal, callbacks = {}) {
   const cw = ans ? (s.correct / ans) * filled : 0;
   const ww = ans ? (s.incorrect / ans) * filled : 0;
   const done = ans >= goal ? "　🎉 達成今日目標！" : "";
-  const modeTag = s.isParentMode ? `<span class="sess-parent-tag">👨‍👩‍👧 家長指定模式</span>` : "";
+  const modeTag = s.isParentMode ? `<span class="sess-parent-tag">🌟 專屬特訓中</span>` : "";
 
   el.session.innerHTML = `<div class="sess-live">
     <div class="sess-head">
@@ -1025,17 +1012,86 @@ export function renderBanner(level, ls, ready, hint, onChallenge) {
 
 // ---------- summary ----------
 export function summaryHidden() { return el.summary.hidden; }
-export function renderSummary(d) {
+export function renderSummary(d, callbacks = {}) {
+  const { onOpenParentConfig, onClearParentConfig, onQuickAssignWrong, onQuickAssignLevel } = callbacks;
+  const parentConfig = d.parentConfig || { active: false, wordIds: [], customWords: [], goal: 0 };
+  const hasParentWords = (parentConfig.wordIds && parentConfig.wordIds.length > 0) ||
+                         (parentConfig.customWords && parentConfig.customWords.length > 0);
+  const isParentActive = hasParentWords && parentConfig.active;
+  const parentTotal = hasParentWords
+    ? (parentConfig.wordIds.length + parentConfig.customWords.length)
+    : 0;
+  const parentGoal = parentConfig.goal || parentTotal || 10;
+  const everWrongCount = d.everWrongWords ? d.everWrongWords.length : (d.everWrongIds ? d.everWrongIds.length : 0);
+
+  // Chips preview for parent active words
+  let parentChipsHtml = "";
+  if (isParentActive) {
+    const previewList = [];
+    if (parentConfig.customWords) {
+      parentConfig.customWords.forEach((cw) => previewList.push({ word: cw.word, isCustom: true }));
+    }
+    if (parentConfig.wordIds) {
+      parentConfig.wordIds.slice(0, 15).forEach((id) => {
+        const found = (d.wordsMap && d.wordsMap.get(id)) || (d.words && d.words.find((w) => w.id === id));
+        previewList.push({ word: found ? found.word : id, isCustom: false });
+      });
+    }
+    const chipsSlice = previewList.slice(0, 12);
+    parentChipsHtml = chipsSlice
+      .map((c) => `<span class="sp-chip ${c.isCustom ? "custom" : ""}">${c.isCustom ? "⭐ " : ""}${c.word}</span>`)
+      .join("");
+    if (parentTotal > 12) {
+      parentChipsHtml += `<span class="sp-chip more">+${parentTotal - 12} 字</span>`;
+    }
+  }
+
   const lvRows = d.levels
-    .map((L) => `<tr><td><span style="color:${levelColor(L.level)}">●</span> Level ${L.level}「${levelName(L.level)}」</td><td>正確率 ${L.rate}%／精通 ${L.mast}／共 ${L.total}</td></tr>`)
+    .map((L) => `<tr>
+      <td><span style="color:${levelColor(L.level)}">●</span> Level ${L.level}「${levelName(L.level)}」</td>
+      <td>正確率 ${L.rate}%／精通 ${L.mast}／共 ${L.total}</td>
+      <td style="text-align:right">
+        <button class="quick-assign-btn" data-assign-lv="${L.level}" title="指派 Level ${L.level}（${L.total}字）為今日練習">🎯 指定此關</button>
+      </td>
+    </tr>`)
     .join("");
+
   const chip = (w) => `<span class="wchip">${w.word}</span>`;
   const fchip = (w) => `<span class="wchip fixed">${w.word}</span>`;
+  const echip = (w) => `<span class="wchip wrong">${w.word}</span>`;
   const none = (t) => `<span style="color:var(--ink3);font-size:13px">${t}</span>`;
   const mastered = d.mastered.slice(0, 60), fixed = d.fixed.slice(0, 60);
+  const wrongList = (d.everWrongWords || []).slice(0, 60);
 
   el.summary.innerHTML = `
-    <h3>📊 學習總結 Summary <a id="sumClose">收起 ✕</a></h3>
+    <h3>📊 學習歷程 · 家長專區 <a id="sumClose">收起 ✕</a></h3>
+
+    <!-- Parent Mission Control Card -->
+    <div class="summary-parent-card">
+      <div class="sp-card-head">
+        <div class="sp-card-title">👨‍👩‍👧 家長專區 · 今日任務指派</div>
+        <div class="sp-badge ${isParentActive ? "active" : ""}">
+          ${isParentActive ? `🌟 已指定 ${parentTotal} 字（目標 ${parentGoal} 題）` : "💡 系統自適應出題中"}
+        </div>
+      </div>
+      <div class="sp-card-body">
+        ${isParentActive ? `
+          <div class="sp-desc">學生今日進入練習將直接測驗您挑選的專屬單字：</div>
+          <div class="sp-chips-bar">${parentChipsHtml}</div>
+          <div class="sp-actions">
+            <button class="btn ghost sm" id="sumParentEdit">⚙️ 調整單字清單</button>
+            <button class="btn ghost sm" id="sumParentClear" style="color:var(--coral)">🔄 取消指定（切換回自適應出題）</button>
+          </div>
+        ` : `
+          <div class="sp-desc">目前學生由系統自適應推薦出題。家長可點擊下方按鈕挑選 2000 字庫，或直接貼上補習班/學校小考單字：</div>
+          <div class="sp-actions">
+            <button class="btn primary sm" id="sumParentSetup">➕ 挑選與設定今日單字</button>
+            ${everWrongCount > 0 ? `<button class="btn ghost sm highlight" id="sumAssignWrongTop">⚠️ 一鍵指派曾錯字 (${everWrongCount})</button>` : ""}
+          </div>
+        `}
+      </div>
+    </div>
+
     <div class="bigrate">
       <b class="tnum">${d.passRate}%</b>
       <span>總答對率<br><small>${d.correct} 題對 / 共作答 ${d.attempts} 題</small></span>
@@ -1043,21 +1099,49 @@ export function renderSummary(d) {
         <b class="tnum" style="font-size:30px;color:var(--violet)">${d.distinctCorrect}</b><br>
         <small>答對過的字（不重複）／ 共 ${d.total} 字</small></span>
     </div>
-    <div class="subh">各關卡進度</div>
+
+    <div class="subh">各關卡進度（點擊可快速指派關卡練習）</div>
     <table class="sumtable">${lvRows}</table>
+
+    <div class="subh" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+      <span>⚠️ 曾拼錯單字（共 ${everWrongCount} 字）</span>
+      ${everWrongCount > 0 ? `<button class="quick-assign-btn highlight" id="sumAssignWrongSec" title="將所有錯字指派為今日練習">⚡ 一鍵指派曾錯字特訓</button>` : ""}
+    </div>
+    <div class="chips-wrap">${wrongList.length ? wrongList.map(echip).join("") : none("目前沒有任何拼錯紀錄，太棒了！")}</div>
+
     <div class="subh">✅ 已精通 ${d.mastered.length} 字（連續答對 3 次）</div>
     <div class="chips-wrap">${mastered.length ? mastered.map(chip).join("") : none("還沒有，繼續加油！")}</div>
-    <div class="subh">🛠️ 曾拼錯、現在已訂正 ${d.fixed.length} 字</div>
+
+    <div class="subh">🛠️ 曾拼錯、現在已訂正精通 ${d.fixed.length} 字</div>
     <div class="chips-wrap">${fixed.length ? fixed.map(fchip).join("") : none("目前沒有")}</div>
+
     <div class="subh">📅 練習紀錄（最近 4 週）</div>
     <div class="streakline">🔥 連續 <b>${d.history.streak}</b> 天　·　最佳 <b>${d.history.best}</b> 天　·　累計練習 <b>${d.history.total}</b> 天</div>
     <div class="heatmap">${d.history.days.map((x) =>
-      `<i class="hc h${x.level}" title="${x.key}：${x.a ? "作答 " + x.a + " · 正確率 " + x.rate + "%" : "沒有練習"}"></i>`).join("")}</div>`;
+      `<i class="hc h${x.level}" title="${x.key}：${x.a ? "作答 " + x.a + " · 正確率 " + x.rate + "%" : "沒有練習"}"></i>`).join("")}</div>
+  `;
+
   $("#sumClose").onclick = () => { el.summary.hidden = true; };
+  if ($("#sumParentSetup")) $("#sumParentSetup").onclick = onOpenParentConfig;
+  if ($("#sumParentEdit")) $("#sumParentEdit").onclick = onOpenParentConfig;
+  if ($("#sumParentClear")) $("#sumParentClear").onclick = onClearParentConfig;
+  if ($("#sumAssignWrongTop")) $("#sumAssignWrongTop").onclick = onQuickAssignWrong;
+  if ($("#sumAssignWrongSec")) $("#sumAssignWrongSec").onclick = onQuickAssignWrong;
+
+  el.summary.querySelectorAll("[data-assign-lv]").forEach((btn) => {
+    btn.onclick = () => {
+      const lv = parseInt(btn.dataset.assignLv);
+      if (onQuickAssignLevel) onQuickAssignLevel(lv);
+    };
+  });
 }
-export function toggleSummary(data) {
+
+export function toggleSummary(data, callbacks = {}) {
   el.summary.hidden = !el.summary.hidden;
-  if (!el.summary.hidden) { renderSummary(data); el.summary.scrollIntoView({ behavior: "smooth", block: "nearest" }); }
+  if (!el.summary.hidden) {
+    renderSummary(data, callbacks);
+    el.summary.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }
 }
 
 // ---------- quiz (placement & challenge) ----------

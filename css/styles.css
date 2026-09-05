@@ -138,6 +138,65 @@ canvas#fx{position:fixed;inset:0;pointer-events:none;z-index:50}
 .summary{margin-top:14px;background:var(--card);border:1px solid var(--line);border-radius:20px;padding:18px;box-shadow:var(--shadow)}
 .summary h3{display:flex;justify-content:space-between;align-items:center;font-size:15px;font-weight:800;margin-bottom:12px}
 .summary h3 a{font-size:12px;color:var(--ink3);cursor:pointer;text-decoration:underline;font-weight:700}
+
+/* Parent Mission Control Card inside Summary */
+.summary-parent-card {
+  background: linear-gradient(135deg, #1d1a38, #141628);
+  border: 1.5px solid rgba(139, 108, 240, 0.45);
+  border-radius: 16px; padding: 14px 16px; margin-bottom: 16px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+}
+.sp-card-head {
+  display: flex; justify-content: space-between; align-items: center;
+  flex-wrap: wrap; gap: 8px; margin-bottom: 8px;
+}
+.sp-card-title {
+  font-size: 14px; font-weight: 800; color: #fff; display: flex; align-items: center; gap: 6px;
+}
+.sp-badge {
+  font-size: 11.5px; font-weight: 700; padding: 3px 10px; border-radius: 20px;
+  background: #252840; color: var(--ink2); border: 1px solid var(--line);
+}
+.sp-badge.active {
+  background: rgba(139, 108, 240, 0.22); color: #caa7ff; border-color: rgba(139, 108, 240, 0.6);
+}
+.sp-desc {
+  font-size: 12.5px; color: var(--ink2); line-height: 1.5; margin-bottom: 10px;
+}
+.sp-chips-bar {
+  display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 10px;
+}
+.sp-chip {
+  font-size: 11.5px; font-weight: 700; padding: 2px 8px; border-radius: 6px;
+  background: #2b2e4a; color: var(--ink); border: 1px solid #3d4166;
+}
+.sp-chip.custom {
+  border-color: var(--violet); color: #caa7ff;
+}
+.sp-chip.more {
+  background: transparent; color: var(--ink3); border-style: dashed;
+}
+.sp-actions {
+  display: flex; gap: 10px; flex-wrap: wrap; align-items: center;
+}
+.btn.sm {
+  padding: 6px 14px; font-size: 12.5px; border-radius: 10px;
+}
+.quick-assign-btn {
+  background: #252840; border: 1px solid var(--line); color: var(--ink2);
+  font-size: 11px; font-weight: 700; border-radius: 6px; padding: 3px 8px;
+  cursor: pointer; transition: all .15s; font-family: inherit;
+}
+.quick-assign-btn:hover {
+  background: var(--violet); color: #fff; border-color: var(--violet);
+}
+.quick-assign-btn.highlight {
+  background: rgba(255, 107, 107, 0.15); color: var(--coral); border-color: rgba(255, 107, 107, 0.4);
+}
+.quick-assign-btn.highlight:hover {
+  background: var(--coral); color: #fff;
+}
+
 .bigrate{display:flex;align-items:center;gap:14px;background:#0f2018;border:1px solid #1a3a28;border-radius:14px;padding:14px 16px}
 .bigrate>b{font-size:40px;color:var(--green);line-height:1}
 .bigrate span{font-size:13px;color:var(--ink2);font-weight:700}.bigrate small{color:var(--ink3);font-weight:600}
@@ -145,6 +204,7 @@ canvas#fx{position:fixed;inset:0;pointer-events:none;z-index:50}
 .chips-wrap{display:flex;flex-wrap:wrap;gap:6px}
 .wchip{font-size:13px;font-weight:700;padding:5px 10px;border-radius:8px;background:#252840;color:var(--ink)}
 .wchip.fixed{background:var(--marker-soft)}
+.wchip.wrong{background:rgba(255, 107, 107, 0.15);color:#ff8e8e;border:1px solid rgba(255, 107, 107, 0.3)}
 .sumtable{width:100%;border-collapse:collapse;font-size:13px}
 .sumtable td{padding:5px 0;border-bottom:1px solid var(--line);color:var(--ink2);font-weight:700}
 .sumtable td:last-child{text-align:right;color:var(--ink);font-variant-numeric:tabular-nums}
