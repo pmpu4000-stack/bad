@@ -1084,9 +1084,12 @@ export function renderSummary(d, callbacks = {}) {
           </div>
         ` : `
           <div class="sp-desc">目前學生由系統自適應推薦出題。家長可點擊下方按鈕挑選 2000 字庫，或直接貼上補習班/學校小考單字：</div>
-          <div class="sp-actions">
-            <button class="btn primary sm" id="sumParentSetup">➕ 挑選與設定今日單字</button>
-            ${everWrongCount > 0 ? `<button class="btn ghost sm highlight" id="sumAssignWrongTop">⚠️ 一鍵指派曾錯字 (${everWrongCount})</button>` : ""}
+          <div class="sp-actions" style="display:flex; flex-wrap:wrap; gap:8px; align-items:center;">
+            <a href="https://script.google.com/macros/s/AKfycbyARhCcpjjkaLlDgibuPSOYb5bL6FcglsxnWMtDqfisOwbKP60E1jKsfa0Pzb69iGTb/exec" target="_blank" class="btn primary sm" style="text-decoration:none; display:inline-flex; align-items:center; gap:6px; background:#8b6cf0; color:#fff; font-weight:700;">
+              📊 開啟「學生學習歷程與家長出題儀表板」 ➔
+            </a>
+            <button class="btn ghost sm" id="sumParentSetup">⚙️ 本地選字</button>
+            ${everWrongCount > 0 ? `<button class="btn ghost sm highlight" id="sumAssignWrongTop">⚠️ 一鍵曾錯字 (${everWrongCount})</button>` : ""}
           </div>
         `}
       </div>
