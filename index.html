@@ -20,6 +20,7 @@
       <input type="text" id="login-user" placeholder="請輸入帳號" style="width:100%; padding:10px; margin-bottom:12px; border:1px solid #2a2e42; border-radius:6px; box-sizing:border-box; background:#15172a; color:#e8eaf0;">
       <input type="password" id="login-pass" placeholder="請輸入密碼" style="width:100%; padding:10px; margin-bottom:20px; border:1px solid #2a2e42; border-radius:6px; box-sizing:border-box; background:#15172a; color:#e8eaf0;">
       <button id="login-btn" style="width:100%; padding:10px; background:#8b6cf0; color:white; border:none; border-radius:6px; font-weight:bold; cursor:pointer;">確認登入</button>
+      <button id="guest-btn" style="width:100%; padding:9px; background:#252840; color:#a0a6c0; border:1px solid #363a52; border-radius:6px; font-weight:700; cursor:pointer; margin-top:8px;">訪客 / 離線直接練習 ➔</button>
       <p id="login-msg" style="color:#f87171; font-size:13px; margin-top:10px;"></p>
     </div>
   </div>
@@ -162,6 +163,18 @@
       } catch (err) {
         console.error(err);
         msgEl.textContent = "連線失敗，請檢查網路。";
+      }
+    });
+
+    // 訪客 / 離線模式直接啟用
+    document.getElementById('guest-btn')?.addEventListener('click', async () => {
+      localStorage.setItem("current_user", "guest");
+      document.getElementById('login-overlay').style.display = 'none';
+      await import('./src/app.js');
+      const uploadBtn = document.getElementById("btn-upload") || document.querySelector(".stat.upload");
+      if (uploadBtn) {
+        uploadBtn.style.cursor = "pointer";
+        uploadBtn.onclick = uploadLocalStorageData;
       }
     });
 

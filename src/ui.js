@@ -86,8 +86,16 @@ export function renderRound(word, mode, { onAnswer, onCheck }) {
   el.checkBtn.style.display = ""; el.checkBtn.disabled = false;
   el.checkBtn.textContent = "檢查 Check"; el.checkBtn.className = "btn primary";
 
-  el.catlabel.textContent = `Level ${word.level}`;
-  el.catlabel.style.background = levelColor(word.level);
+  if (word.isCustom) {
+    el.catlabel.textContent = "家長自訂";
+    el.catlabel.style.background = "var(--violet)";
+  } else if (word.isParentWord) {
+    el.catlabel.textContent = `👨‍👩‍👧 家長指定 · L${word.level}`;
+    el.catlabel.style.background = "var(--violet)";
+  } else {
+    el.catlabel.textContent = `Level ${word.level}`;
+    el.catlabel.style.background = levelColor(word.level);
+  }
   el.modehint.textContent = MHINT[mode];
   if (word.zh) {
     const phon = word.ph ? ` <span class="phon">[${word.ph}]</span>` : "";
@@ -260,28 +268,526 @@ export function renderProgress(s) {
   $("#n-mast").textContent = s.mast; $("#n-total").textContent = s.total;
 }
 
-export function renderSession(s, goal, onStart, onEnd) {
+export function renderSession(s, defaultGoal, callbacks = {}) {
+  const { onStart, onEnd, onOpenParentConfig, onToggleParentMode, parentConfig } = callbacks;
+  const hasParentWords = parentConfig && (
+    (parentConfig.wordIds && parentConfig.wordIds.length > 0) ||
+    (parentConfig.customWords && parentConfig.customWords.length > 0)
+  );
+  const parentCount = hasParentWords
+    ? (parentConfig.wordIds.length + parentConfig.customWords.length)
+    : 0;
+  const isParentActive = hasParentWords && parentConfig.active;
+
   if (!s.active) {
-    el.session.innerHTML = `<div class="sess-idle">
-      <div class="sess-title">今日練習 <span>Today's Session</span></div>
-      <button class="sess-start" id="sessStart">▶️ 開始今天的練習</button></div>`;
-    $("#sessStart").onclick = onStart;
+    if (isParentActive) {
+      el.session.innerHTML = `<div class="sess-idle">
+        <div class="sess-title">
+          今日練習 <span>Today's Session</span>
+          <span class="sess-parent-tag">👨‍👩‍👧 家長指定 (${parentCount} 字)</span>
+        </div>
+        <div class="sess-btn-group">
+          <button class="sess-btn-parent" id="sessParentEdit">⚙️ 調整單字</button>
+          <button class="sess-btn-toggle" id="sessParentToggle" title="切換為一般等級練習">切換等級練習</button>
+          <button class="sess-start" id="sessStart">▶️ 開始指定練習</button>
+        </div>
+      </div>`;
+      if ($("#sessParentEdit")) $("#sessParentEdit").onclick = onOpenParentConfig;
+      if ($("#sessParentToggle")) $("#sessParentToggle").onclick = () => onToggleParentMode(false);
+      $("#sessStart").onclick = () => onStart({ isParent: true });
+    } else {
+      const toggleBtn = hasParentWords ? `<button class="sess-btn-toggle" id="sessParentToggle" title="切換為家長指定單字模式">使用家長清單 (${parentCount}字)</button>` : "";
+      el.session.innerHTML = `<div class="sess-idle">
+        <div class="sess-title">今日練習 <span>Today's Session</span></div>
+        <div class="sess-btn-group">
+          <button class="sess-btn-parent" id="sessParentSetup">👨‍👩‍👧 家長挑選與設定單字</button>
+          ${toggleBtn}
+          <button class="sess-start" id="sessStart">▶️ 開始今天的練習</button>
+        </div>
+      </div>`;
+      if ($("#sessParentSetup")) $("#sessParentSetup").onclick = onOpenParentConfig;
+      if ($("#sessParentToggle")) $("#sessParentToggle").onclick = () => onToggleParentMode(true);
+      $("#sessStart").onclick = () => onStart({ isParent: false });
+    }
     return;
   }
+
+  const goal = s.goal || defaultGoal;
   const ans = s.answered;
   const filled = Math.min(100, (ans / goal) * 100);
   const cw = ans ? (s.correct / ans) * filled : 0;
   const ww = ans ? (s.incorrect / ans) * filled : 0;
   const done = ans >= goal ? "　🎉 達成今日目標！" : "";
+  const modeTag = s.isParentMode ? `<span class="sess-parent-tag">👨‍👩‍👧 家長指定模式</span>` : "";
+
   el.session.innerHTML = `<div class="sess-live">
     <div class="sess-head">
-      <span class="sess-title">今日練習 <span>目標 ${goal} 題</span></span>
+      <span class="sess-title">今日練習 ${modeTag} <span>目標 ${goal} 題</span></span>
       <button class="sess-end" id="sessEnd">⏹ 結束今天的練習</button>
     </div>
     <div class="sess-bar"><i class="c" style="width:${cw}%"></i><i class="w" style="width:${ww}%"></i></div>
     <div class="sess-nums">作答 <b>${ans}</b>　·　✅ 答對 <b>${s.correct}</b>　·　❌ 答錯 <b>${s.incorrect}</b>　·　正確率 <b>${s.rate}%</b>${done}</div>
   </div>`;
   $("#sessEnd").onclick = onEnd;
+}
+
+export function makeDefaultMask(word) {
+  const m = new Array(word.length).fill(false);
+  const vowels = "aeiou";
+  let masked = false;
+  for (let i = 1; i < word.length; i++) {
+    if (vowels.includes(word[i].toLowerCase())) {
+      m[i] = true;
+      masked = true;
+    }
+  }
+  if (!masked && word.length > 1) {
+    m[Math.floor(word.length / 2)] = true;
+  }
+  return m;
+}
+
+export function showParentModal({
+  words,
+  currentConfig,
+  everWrongIds = [],
+  unmasteredIds = [],
+  onSave,
+  onClear,
+}) {
+  const existing = document.querySelector(".parent-modal-overlay");
+  if (existing) existing.remove();
+
+  const wordsMap = new Map();
+  words.forEach((w) => wordsMap.set(w.id, w));
+
+  const selectedIds = new Set(currentConfig.wordIds || []);
+  const customWordsMap = new Map();
+  (currentConfig.customWords || []).forEach((cw) => {
+    customWordsMap.set(cw.word.toLowerCase(), cw);
+  });
+
+  const wrongSet = new Set(everWrongIds);
+  const unmastSet = new Set(unmasteredIds);
+
+  let searchQuery = "";
+  let levelFilter = 0; // 0 = all
+  let presetFilter = null; // null | "wrong" | "unmastered"
+
+  const overlay = document.createElement("div");
+  overlay.className = "parent-modal-overlay";
+
+  overlay.innerHTML = `
+    <div class="parent-dialog">
+      <div class="parent-head">
+        <h2>👨‍👩‍👧 家長挑選與設定練習單字</h2>
+        <button class="parent-close" id="pModalClose" title="關閉">✕</button>
+      </div>
+      <div class="parent-tabs">
+        <button class="parent-tab active" id="tabBank">📚 從 2000 單字庫挑選</button>
+        <button class="parent-tab" id="tabCustom">✏️ 自訂輸入 / 貼上單字</button>
+      </div>
+      <div class="parent-body">
+        <!-- Tab 1: Bank Area -->
+        <div id="pBankArea">
+          <div class="parent-search-row">
+            <input type="text" class="parent-search-input" id="pSearch" placeholder="🔍 搜尋英文單字或中文意思（例如 apple、學校）...">
+          </div>
+          <div class="parent-presets" style="margin-top: 8px;">
+            <span style="font-size:12px;color:var(--ink3);font-weight:700">智慧篩選：</span>
+            <button class="preset-btn" id="preWrong">⚠️ 曾拼錯字 (${everWrongIds.length})</button>
+            <button class="preset-btn" id="preUnmastered">🌱 未精通單字</button>
+            <button class="preset-btn" id="preRand10">🎲 隨機抽 10 字</button>
+            <button class="preset-btn" id="preRand20">🎲 隨機抽 20 字</button>
+          </div>
+          <div class="parent-filter-row" style="margin-top: 8px;">
+            <button class="parent-lv-chip active" data-lv="0">全部關卡</button>
+            <button class="parent-lv-chip" data-lv="1">Level 1</button>
+            <button class="parent-lv-chip" data-lv="2">Level 2</button>
+            <button class="parent-lv-chip" data-lv="3">Level 3</button>
+            <button class="parent-lv-chip" data-lv="4">Level 4</button>
+            <button class="parent-lv-chip" data-lv="5">Level 5</button>
+          </div>
+          <div class="parent-list-tools" style="margin-top: 8px;">
+            <span>符合篩選：<b id="pFilteredCount" style="color:var(--ink)">0</b> 字</span>
+            <div>
+              <button class="parent-tool-btn" id="pSelectAll">全選此篩選</button>
+              <button class="parent-tool-btn" id="pDeselectAll">取消勾選此篩選</button>
+            </div>
+          </div>
+          <div class="parent-word-list" id="pWordList" style="margin-top: 4px;"></div>
+        </div>
+
+        <!-- Tab 2: Custom Area -->
+        <div id="pCustomArea" style="display:none;" class="parent-custom-area">
+          <p style="font-size:13px;color:var(--ink2);line-height:1.6;">
+            貼上或輸入學校、補習班的單字清單（支援逗號、頓號、空格或換行分隔）：<br>
+            <small style="color:var(--ink3)">系統會自動比對 2000 字庫對應例句與中文，非庫內單字亦能進行語音發音與拼字測驗！</small>
+          </p>
+          <textarea class="parent-textarea" id="pCustomInput" placeholder="例如：apple, banana, library, astronaut, volcano..."></textarea>
+          <div style="display:flex;gap:10px;align-items:center;">
+            <button class="btn primary" id="pParseCustomBtn" style="flex:none;padding:8px 18px;font-size:13px">🔍 解析並加入單字</button>
+            <span id="pParseMsg" style="font-size:12.5px;font-weight:700"></span>
+          </div>
+        </div>
+
+        <!-- Selected Summary Box -->
+        <div class="parent-selected-box">
+          <div class="parent-selected-title">
+            <span>已挑選清單（共 <b id="pTotalSelected" style="color:var(--violet-d);font-size:15px">0</b> 字）</span>
+            <a id="pClearAllBtn" style="color:var(--coral);cursor:pointer;font-size:11.5px;text-decoration:underline">清空已選</a>
+          </div>
+          <div class="parent-chips-bar" id="pChipsBar"></div>
+        </div>
+
+        <!-- Goal Row -->
+        <div class="parent-goal-row">
+          <span>今日練習目標題數：</span>
+          <input type="number" min="1" max="100" class="parent-goal-input" id="pGoalInput" value="${currentConfig.goal || 10}">
+          <span style="font-size:12px;color:var(--ink3)">題（預設自動調整為選取總字數）</span>
+        </div>
+      </div>
+
+      <div class="parent-foot">
+        <button class="btn ghost" id="pCancelBtn" style="flex:none;min-width:70px">取消</button>
+        <button class="btn ghost" id="pClearConfigBtn" style="flex:none;min-width:100px;color:var(--coral)" title="清空家長挑選設定">清空設定</button>
+        <button class="btn ghost" id="pSaveOnlyBtn" style="flex:1;min-width:120px">💾 僅儲存設定</button>
+        <button class="btn go" id="pSaveAndStartBtn" style="flex:1;min-width:150px">▶️ 儲存並開始練習</button>
+      </div>
+    </div>
+  `;
+
+  document.body.append(overlay);
+
+  const $p = (sel) => overlay.querySelector(sel);
+  const pWordList = $p("#pWordList");
+  const pChipsBar = $p("#pChipsBar");
+  const pTotalSelected = $p("#pTotalSelected");
+  const pFilteredCount = $p("#pFilteredCount");
+  const pGoalInput = $p("#pGoalInput");
+  const pSearch = $p("#pSearch");
+  const pCustomInput = $p("#pCustomInput");
+  const pParseMsg = $p("#pParseMsg");
+
+  function getTotalCount() {
+    return selectedIds.size + customWordsMap.size;
+  }
+
+  function updateSelectedChips() {
+    const total = getTotalCount();
+    pTotalSelected.textContent = total;
+    if (total > 0 && (!pGoalInput.dataset.manual || pGoalInput.value == 0)) {
+      pGoalInput.value = total;
+    }
+    pChipsBar.innerHTML = "";
+
+    if (total === 0) {
+      pChipsBar.innerHTML = `<span style="color:var(--ink3);font-size:12px">尚未挑選任何單字，請從上方題庫勾選或貼上自訂單字。</span>`;
+      return;
+    }
+
+    // Render bank words
+    selectedIds.forEach((id) => {
+      const w = wordsMap.get(id);
+      if (!w) return;
+      const chip = document.createElement("span");
+      chip.className = "parent-chip";
+      chip.innerHTML = `${w.word} <span class="rm" title="移除">✕</span>`;
+      chip.querySelector(".rm").onclick = () => {
+        selectedIds.delete(id);
+        updateSelectedChips();
+        updateListCheckboxes();
+      };
+      pChipsBar.append(chip);
+    });
+
+    // Render custom words
+    customWordsMap.forEach((cw, key) => {
+      const chip = document.createElement("span");
+      chip.className = "parent-chip";
+      chip.style.borderColor = "var(--violet)";
+      chip.innerHTML = `⭐ ${cw.word} <span class="rm" title="移除">✕</span>`;
+      chip.querySelector(".rm").onclick = () => {
+        customWordsMap.delete(key);
+        updateSelectedChips();
+      };
+      pChipsBar.append(chip);
+    });
+  }
+
+  function getFilteredWords() {
+    const q = searchQuery.trim().toLowerCase();
+    return words.filter((w) => {
+      if (levelFilter > 0 && w.level !== levelFilter) return false;
+      if (presetFilter === "wrong" && !wrongSet.has(w.id)) return false;
+      if (presetFilter === "unmastered" && !unmastSet.has(w.id)) return false;
+      if (q) {
+        const inWord = w.word.toLowerCase().includes(q);
+        const inZh = w.zh && w.zh.includes(q);
+        if (!inWord && !inZh) return false;
+      }
+      return true;
+    });
+  }
+
+  function updateListCheckboxes() {
+    pWordList.querySelectorAll("input[type='checkbox']").forEach((cb) => {
+      cb.checked = selectedIds.has(cb.dataset.id);
+    });
+  }
+
+  function renderWordList() {
+    const filtered = getFilteredWords();
+    pFilteredCount.textContent = filtered.length;
+    pWordList.innerHTML = "";
+
+    if (filtered.length === 0) {
+      pWordList.innerHTML = `<div style="padding:24px;text-align:center;color:var(--ink3);font-size:13px">沒有符合條件的單字</div>`;
+      return;
+    }
+
+    const MAX_SHOW = 150;
+    const slice = filtered.slice(0, MAX_SHOW);
+
+    slice.forEach((w) => {
+      const item = document.createElement("div");
+      item.className = "parent-word-item";
+      const isChecked = selectedIds.has(w.id);
+      const phon = w.ph ? ` [${w.ph}]` : "";
+      const isWrong = wrongSet.has(w.id);
+      const badge = isWrong ? `<span class="p-w-badge" style="color:var(--coral)" title="曾拼錯">❌</span>` : "";
+
+      item.innerHTML = `
+        <input type="checkbox" data-id="${w.id}" ${isChecked ? "checked" : ""}>
+        <span class="p-w-text">${w.word}</span>
+        <span class="p-w-zh">${w.zh || ""}${phon}</span>
+        ${badge}
+        <span class="p-w-lv" style="background:${levelColor(w.level)}">L${w.level}</span>
+      `;
+
+      const cb = item.querySelector("input[type='checkbox']");
+      const toggle = () => {
+        if (selectedIds.has(w.id)) {
+          selectedIds.delete(w.id);
+          cb.checked = false;
+        } else {
+          selectedIds.add(w.id);
+          cb.checked = true;
+        }
+        updateSelectedChips();
+      };
+
+      item.onclick = (e) => {
+        if (e.target !== cb) toggle();
+      };
+      cb.onchange = () => toggle();
+
+      pWordList.append(item);
+    });
+
+    if (filtered.length > MAX_SHOW) {
+      const more = document.createElement("div");
+      more.style.padding = "10px";
+      more.style.textAlign = "center";
+      more.style.color = "var(--ink3)";
+      more.style.fontSize = "12px";
+      more.textContent = `... 還有 ${filtered.length - MAX_SHOW} 個單字，請輸入關鍵字進一步篩選。`;
+      pWordList.append(more);
+    }
+  }
+
+  // --- Search & Filter Events ---
+  pSearch.oninput = (e) => {
+    searchQuery = e.target.value;
+    renderWordList();
+  };
+
+  overlay.querySelectorAll(".parent-lv-chip").forEach((chip) => {
+    chip.onclick = () => {
+      overlay.querySelectorAll(".parent-lv-chip").forEach((c) => c.classList.remove("active"));
+      chip.classList.add("active");
+      levelFilter = +chip.dataset.lv;
+      renderWordList();
+    };
+  });
+
+  const preWrong = $p("#preWrong");
+  const preUnmastered = $p("#preUnmastered");
+  preWrong.onclick = () => {
+    if (presetFilter === "wrong") {
+      presetFilter = null;
+      preWrong.classList.remove("active");
+    } else {
+      presetFilter = "wrong";
+      preWrong.classList.add("active");
+      preUnmastered.classList.remove("active");
+    }
+    renderWordList();
+  };
+
+  preUnmastered.onclick = () => {
+    if (presetFilter === "unmastered") {
+      presetFilter = null;
+      preUnmastered.classList.remove("active");
+    } else {
+      presetFilter = "unmastered";
+      preUnmastered.classList.add("active");
+      preWrong.classList.remove("active");
+    }
+    renderWordList();
+  };
+
+  $p("#preRand10").onclick = () => {
+    const list = getFilteredWords();
+    const picks = shuffle([...list]).slice(0, 10);
+    picks.forEach((w) => selectedIds.add(w.id));
+    updateSelectedChips();
+    updateListCheckboxes();
+  };
+
+  $p("#preRand20").onclick = () => {
+    const list = getFilteredWords();
+    const picks = shuffle([...list]).slice(0, 20);
+    picks.forEach((w) => selectedIds.add(w.id));
+    updateSelectedChips();
+    updateListCheckboxes();
+  };
+
+  $p("#pSelectAll").onclick = () => {
+    const list = getFilteredWords();
+    list.forEach((w) => selectedIds.add(w.id));
+    updateSelectedChips();
+    updateListCheckboxes();
+  };
+
+  $p("#pDeselectAll").onclick = () => {
+    const list = getFilteredWords();
+    list.forEach((w) => selectedIds.delete(w.id));
+    updateSelectedChips();
+    updateListCheckboxes();
+  };
+
+  $p("#pClearAllBtn").onclick = () => {
+    selectedIds.clear();
+    customWordsMap.clear();
+    updateSelectedChips();
+    updateListCheckboxes();
+  };
+
+  pGoalInput.oninput = () => {
+    pGoalInput.dataset.manual = "true";
+  };
+
+  // --- Tabs ---
+  const tabBank = $p("#tabBank");
+  const tabCustom = $p("#tabCustom");
+  const pBankArea = $p("#pBankArea");
+  const pCustomArea = $p("#pCustomArea");
+
+  tabBank.onclick = () => {
+    tabBank.classList.add("active");
+    tabCustom.classList.remove("active");
+    pBankArea.style.display = "";
+    pCustomArea.style.display = "none";
+  };
+
+  tabCustom.onclick = () => {
+    tabCustom.classList.add("active");
+    tabBank.classList.remove("active");
+    pBankArea.style.display = "none";
+    pCustomArea.style.display = "flex";
+  };
+
+  // --- Parse Custom Words ---
+  $p("#pParseCustomBtn").onclick = () => {
+    const text = pCustomInput.value;
+    if (!text.trim()) {
+      pParseMsg.style.color = "var(--coral)";
+      pParseMsg.textContent = "請先輸入單字文字";
+      return;
+    }
+    const tokens = text.match(/[a-zA-Z][a-zA-Z' -]*/g) || [];
+    if (!tokens.length) {
+      pParseMsg.style.color = "var(--coral)";
+      pParseMsg.textContent = "未找到有效的英文單字";
+      return;
+    }
+
+    const wordsLowerMap = new Map();
+    words.forEach((w) => wordsLowerMap.set(w.word.toLowerCase(), w));
+
+    let bankCount = 0, customCount = 0;
+    tokens.forEach((raw) => {
+      const clean = raw.trim();
+      const lower = clean.toLowerCase();
+      if (!lower) return;
+
+      if (wordsLowerMap.has(lower)) {
+        selectedIds.add(wordsLowerMap.get(lower).id);
+        bankCount++;
+      } else {
+        if (!customWordsMap.has(lower)) {
+          customWordsMap.set(lower, {
+            id: "custom_" + lower,
+            word: lower,
+            display: clean,
+            level: 1,
+            mask: makeDefaultMask(lower),
+            zh: "家長自訂單字",
+            sent: "",
+            ph: "",
+            isCustom: true,
+          });
+          customCount++;
+        }
+      }
+    });
+
+    pParseMsg.style.color = "var(--green)";
+    pParseMsg.textContent = `已加入！其中 ${bankCount} 個在庫單字、${customCount} 個新自訂單字。`;
+    pCustomInput.value = "";
+    updateSelectedChips();
+    updateListCheckboxes();
+  };
+
+  // --- Close & Save ---
+  const close = () => overlay.remove();
+  $p("#pModalClose").onclick = close;
+  $p("#pCancelBtn").onclick = close;
+  overlay.onclick = (e) => {
+    if (e.target === overlay) close();
+  };
+
+  $p("#pClearConfigBtn").onclick = () => {
+    if (confirm("確定要清空家長挑選設定，切換回一般等級練習嗎？")) {
+      onClear();
+      close();
+    }
+  };
+
+  function doSave(startNow) {
+    const total = getTotalCount();
+    if (total === 0) {
+      alert("請至少挑選或輸入 1 個單字！");
+      return;
+    }
+    const goal = parseInt(pGoalInput.value) || total || 10;
+    const config = {
+      active: true,
+      wordIds: Array.from(selectedIds),
+      customWords: Array.from(customWordsMap.values()),
+      goal,
+    };
+    onSave(config, startNow);
+    close();
+  }
+
+  $p("#pSaveOnlyBtn").onclick = () => doSave(false);
+  $p("#pSaveAndStartBtn").onclick = () => doSave(true);
+
+  // Initial render
+  updateSelectedChips();
+  renderWordList();
 }
 
 export function renderBanner(level, ls, ready, hint, onChallenge) {

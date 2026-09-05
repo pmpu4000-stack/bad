@@ -4,7 +4,7 @@
 // =====================================================================
 import { loadWordBank } from "./wordbank.js";
 import * as store from "./store.js";
-import { nextWord } from "./srs.js";
+import { nextWord, nextParentWord } from "./srs.js";
 import * as ui from "./ui.js";
 import { burst } from "./confetti.js";
 import {
@@ -17,6 +17,23 @@ const state = { mode: "listen", word: null, answered: false, round: null };
 
 const wordsAt = (level) => WORDS.filter((w) => w.level === level);
 
+function getActiveParentWordPool() {
+  const cfg = store.getParentConfig();
+  if (!cfg.active) return [];
+  const wordsMap = new Map();
+  WORDS.forEach((w) => wordsMap.set(w.id, w));
+
+  const list = [];
+  (cfg.wordIds || []).forEach((id) => {
+    const w = wordsMap.get(id);
+    if (w) list.push({ ...w, isParentWord: true });
+  });
+  (cfg.customWords || []).forEach((cw) => {
+    list.push({ ...cw, isParentWord: true });
+  });
+  return list;
+}
+
 function levelInfo() {
   const prog = store.progress();
   return LEVELS.map((L) => {
@@ -27,9 +44,46 @@ function levelInfo() {
   });
 }
 
+function openParentModal() {
+  const allWordIds = WORDS.map((w) => w.id);
+  const unmasteredIds = allWordIds.filter((id) => store.box(id) < 3);
+  const everWrongIds = store.getEverWrongWordIds();
+
+  ui.showParentModal({
+    words: WORDS,
+    currentConfig: store.getParentConfig(),
+    everWrongIds,
+    unmasteredIds,
+    onSave: (config, startNow) => {
+      store.setParentConfig(config);
+      refreshChrome();
+      if (startNow) {
+        onSessionStart({ isParent: true });
+      } else {
+        newRound();
+      }
+    },
+    onClear: () => {
+      store.clearParentConfig();
+      refreshChrome();
+      newRound();
+    },
+  });
+}
+
 // Repaint the level bar, header stats, and the gate banner.
 function refreshChrome() {
-  ui.renderSession(store.sessionState(), DAILY_GOAL, onSessionStart, onSessionEnd);
+  ui.renderSession(store.sessionState(), DAILY_GOAL, {
+    onStart: onSessionStart,
+    onEnd: onSessionEnd,
+    onOpenParentConfig: openParentModal,
+    onToggleParentMode: (active) => {
+      store.setParentActive(active);
+      refreshChrome();
+      newRound();
+    },
+    parentConfig: store.getParentConfig(),
+  });
   ui.renderProgress(store.stats(WORDS));
   ui.renderLevelBar(levelInfo(), pickLevel);
   const cur = store.progress().current;
@@ -47,7 +101,16 @@ function renderCurrent() {
   state.round = ui.renderRound(state.word, state.mode, { onAnswer: answer, onCheck: check });
 }
 function newRound() {
-  state.word = nextWord(WORDS, store.progress().current, state.word?.id);
+  const sess = store.sessionState();
+  const parentPool = getActiveParentWordPool();
+
+  if (sess.active && sess.isParentMode && parentPool.length > 0) {
+    state.word = nextParentWord(parentPool, sess.ids || {}, state.word?.id);
+  } else if (!sess.active && parentPool.length > 0) {
+    state.word = nextParentWord(parentPool, {}, state.word?.id);
+  } else {
+    state.word = nextWord(WORDS, store.progress().current, state.word?.id);
+  }
   state.answered = false;
   renderCurrent();
 }
@@ -66,30 +129,48 @@ function check() {
 function answer(correct) {
   if (state.answered) return;
   state.answered = true;
-  const info = store.grade(state.word.id, correct, store.progress().current);
+  const info = store.grade(state.word.id, correct, state.word.level || store.progress().current);
   ui.showResult(correct, state.word, info);
   if (correct) burst();
   refreshChrome();
   ui.setActionNext();
 }
 
-function pickLevel(n) { store.setCurrentLevel(n); refreshChrome(); newRound(); }
+function pickLevel(n) {
+  store.setCurrentLevel(n);
+  store.setParentActive(false);
+  refreshChrome();
+  newRound();
+}
 
 // ---- today's training session ----
-function onSessionStart() { store.sessionStart(); refreshChrome(); }
+function onSessionStart(options = {}) {
+  const cfg = store.getParentConfig();
+  const parentPool = getActiveParentWordPool();
+  const isParent = options.isParent !== undefined
+    ? options.isParent
+    : (cfg.active && parentPool.length > 0);
+  const goal = isParent ? (cfg.goal || parentPool.length || DAILY_GOAL) : DAILY_GOAL;
+  store.sessionStart({ isParent, goal });
+  refreshChrome();
+  newRound();
+}
 function onSessionEnd() { showSessionSummary(store.sessionEnd()); }
 
 function showSessionSummary(sum) {
   ui.setScreen("quiz");
+  const headline = sum.isParentMode
+    ? (sum.answered ? "🎉 家長指定練習完成！" : "家長指定練習未開始")
+    : (sum.answered ? "今天辛苦了！" : "今天還沒有練習");
   ui.quizResult({
     emoji: sum.answered ? "🎉" : "👋",
-    color: "var(--violet)",
-    headline: sum.answered ? "今天辛苦了！" : "今天還沒有練習",
+    color: sum.isParentMode ? "var(--violet)" : "var(--green)",
+    headline,
     sub: sum.answered
       ? `作答 ${sum.answered} 題 · ✅ ${sum.correct} · ❌ ${sum.incorrect} · 正確率 ${sum.rate}%`
       : "下次按「開始今天的練習」再開始吧",
     extraHtml: sum.answered
-      ? `<div class="sub">練了 ${sum.distinct} 個不同的字${sum.mastered ? ` · 新精通 ${sum.mastered} 字 ⭐` : ""}</div>
+      ? `<div class="sub">練了 ${sum.distinct} 個不同的單字${sum.mastered ? ` · 新精通 ${sum.mastered} 字 ⭐` : ""}</div>
          <div class="sub" style="color:var(--catD)">🔥 連續練習 ${store.historyData().streak} 天</div>`
       : "",
     btnLabel: "完成 →",

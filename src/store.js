@@ -26,8 +26,10 @@ function fresh() {
   return {
     box: {}, stat: {}, lstat: {},
     level: { current: 1, unlocked: 1, placed: false },
+    // parent-picked word configuration
+    parentConfig: { active: false, wordIds: [], customWords: [], goal: 0 },
     // one day's training run; counters reset each time you "start today's training"
-    session: { active: false, date: null, answered: 0, correct: 0, incorrect: 0, ids: {}, mastered: 0 },
+    session: { active: false, date: null, answered: 0, correct: 0, incorrect: 0, ids: {}, mastered: 0, isParentMode: false, goal: 0 },
     // per-day practice log, keyed by date -> { a: answered, c: correct, w: wrong, m: newly mastered }
     history: {},
     points: 0, streak: 0, best: 0, attempts: 0, correct: 0,
@@ -42,6 +44,7 @@ function load() {
     const merged = {
       ...base, ...d,
       level: { ...base.level, ...(d.level || {}) },
+      parentConfig: { ...base.parentConfig, ...(d.parentConfig || {}) },
       session: { ...base.session, ...(d.session || {}) },
       history: d.history || {},
     };
@@ -100,21 +103,38 @@ export function grade(id, correct, level) {
 export function reset() { DB = fresh(); save(); }
 
 // ---- today's training session ----
-export function sessionStart() {
-  DB.session = { active: true, date: todayStr(), answered: 0, correct: 0, incorrect: 0, ids: {}, mastered: 0 };
+export function sessionStart(options = {}) {
+  const isParent = !!options.isParent;
+  const goal = options.goal || 0;
+  DB.session = {
+    active: true,
+    date: todayStr(),
+    answered: 0,
+    correct: 0,
+    incorrect: 0,
+    ids: {},
+    mastered: 0,
+    isParentMode: isParent,
+    goal: goal,
+  };
   save();
 }
+
 export function sessionEnd() {
   const s = DB.session;
   const summary = {
     answered: s.answered, correct: s.correct, incorrect: s.incorrect,
     distinct: Object.keys(s.ids).length, mastered: s.mastered,
     rate: s.answered ? Math.round((s.correct / s.answered) * 100) : 0,
+    isParentMode: !!s.isParentMode,
+    goal: s.goal || 0,
+    ids: { ...s.ids },
   };
   DB.session.active = false;
   save();
   return summary;
 }
+
 // Practice history for the last `n` days + streaks, for the calendar heatmap.
 export function historyData(n = 28) {
   const days = [];
@@ -142,7 +162,55 @@ export function sessionState() {
     active: s.active, answered: s.answered, correct: s.correct, incorrect: s.incorrect,
     distinct: Object.keys(s.ids).length,
     rate: s.answered ? Math.round((s.correct / s.answered) * 100) : 0,
+    isParentMode: !!s.isParentMode,
+    goal: s.goal || 0,
+    ids: { ...s.ids },
   };
+}
+
+// ---- parent custom words configuration ----
+export function getParentConfig() {
+  if (!DB.parentConfig) {
+    DB.parentConfig = { active: false, wordIds: [], customWords: [], goal: 0 };
+  }
+  return {
+    active: !!DB.parentConfig.active,
+    wordIds: Array.isArray(DB.parentConfig.wordIds) ? [...DB.parentConfig.wordIds] : [],
+    customWords: Array.isArray(DB.parentConfig.customWords) ? [...DB.parentConfig.customWords] : [],
+    goal: DB.parentConfig.goal || 0,
+  };
+}
+
+export function setParentConfig({ active = true, wordIds = [], customWords = [], goal = 0 }) {
+  DB.parentConfig = {
+    active: !!active,
+    wordIds: Array.isArray(wordIds) ? wordIds : [],
+    customWords: Array.isArray(customWords) ? customWords : [],
+    goal: goal || 0,
+  };
+  save();
+}
+
+export function setParentActive(active) {
+  if (!DB.parentConfig) {
+    DB.parentConfig = { active: false, wordIds: [], customWords: [], goal: 0 };
+  }
+  DB.parentConfig.active = !!active;
+  save();
+}
+
+export function clearParentConfig() {
+  DB.parentConfig = { active: false, wordIds: [], customWords: [], goal: 0 };
+  save();
+}
+
+// Helper: return set of word ids that student has ever got wrong
+export function getEverWrongWordIds() {
+  const res = [];
+  for (const id in DB.stat) {
+    if (DB.stat[id] && DB.stat[id].ew) res.push(id);
+  }
+  return res;
 }
 
 // ---- level progression ----

@@ -222,9 +222,192 @@ canvas#fx{position:fixed;inset:0;pointer-events:none;z-index:50}
 .result .sub{font-size:15px;color:var(--ink2);font-weight:700}
 .result .lvpill{font-size:20px;font-weight:800;color:#fff;padding:8px 20px;border-radius:999px}
 
+/* ---------- parent word selection modal & session enhancements ---------- */
+.sess-parent-tag {
+  display: inline-flex; align-items: center; gap: 5px;
+  background: rgba(139, 108, 240, 0.18); border: 1px solid var(--violet);
+  color: var(--violet-d); font-size: 11.5px; font-weight: 800;
+  padding: 3px 8px; border-radius: 999px; margin-left: 6px;
+}
+.sess-btn-group {
+  display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-left: auto;
+}
+.sess-btn-parent {
+  border: 1.5px solid var(--violet); border-radius: 13px; padding: 10px 15px;
+  font-weight: 800; font-size: 13px; font-family: inherit; cursor: pointer;
+  color: var(--violet-d); background: #1e1a3a; transition: all .15s ease;
+  white-space: nowrap; display: inline-flex; align-items: center; gap: 6px;
+}
+.sess-btn-parent:hover {
+  background: var(--violet); color: #fff; transform: translateY(-1px);
+}
+.sess-btn-toggle {
+  border: 1px dashed var(--line); border-radius: 10px; padding: 6px 10px;
+  font-size: 11.5px; font-family: inherit; cursor: pointer;
+  color: var(--ink3); background: none; transition: color .15s;
+}
+.sess-btn-toggle:hover { color: var(--ink2); border-color: var(--ink3); }
+
+/* Parent Modal */
+.parent-modal-overlay {
+  position: fixed; inset: 0; background: rgba(10, 12, 20, 0.82);
+  backdrop-filter: blur(6px); z-index: 9999;
+  display: flex; justify-content: center; align-items: center; padding: 16px;
+}
+.parent-dialog {
+  background: var(--card); border: 1px solid var(--line); border-radius: 20px;
+  box-shadow: 0 20px 50px rgba(0,0,0,0.6); width: 100%; max-width: 680px;
+  max-height: 92vh; display: flex; flex-direction: column; overflow: hidden;
+  animation: pop .25s ease;
+}
+.parent-head {
+  padding: 16px 20px; border-bottom: 1px solid var(--line);
+  display: flex; align-items: center; justify-content: space-between;
+}
+.parent-head h2 { font-size: 17px; font-weight: 800; color: var(--ink); display: flex; align-items: center; gap: 8px; }
+.parent-close {
+  background: none; border: none; color: var(--ink3); font-size: 20px;
+  cursor: pointer; padding: 4px 8px; border-radius: 8px; line-height: 1;
+}
+.parent-close:hover { color: var(--coral); background: #252840; }
+
+.parent-tabs {
+  display: flex; border-bottom: 1px solid var(--line); background: #15172a;
+}
+.parent-tab {
+  flex: 1; padding: 12px; font-size: 13.5px; font-weight: 800; text-align: center;
+  border: none; background: none; color: var(--ink3); cursor: pointer;
+  transition: all .15s; border-bottom: 2px solid transparent;
+}
+.parent-tab.active {
+  color: var(--violet-d); border-bottom-color: var(--violet); background: var(--card);
+}
+
+.parent-body {
+  padding: 16px 20px; overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 12px;
+}
+.parent-search-row {
+  display: flex; gap: 8px; align-items: center;
+}
+.parent-search-input {
+  flex: 1; padding: 9px 14px; border-radius: 12px; border: 1.5px solid var(--line);
+  background: #15172a; color: var(--ink); font-size: 14px; outline: none;
+}
+.parent-search-input:focus {
+  border-color: var(--violet); box-shadow: 0 0 0 3px rgba(139,108,240,0.2);
+}
+
+.parent-presets {
+  display: flex; gap: 6px; flex-wrap: wrap; align-items: center;
+}
+.preset-btn {
+  background: #1e2136; border: 1px solid var(--line); border-radius: 8px;
+  padding: 5px 10px; font-size: 12px; font-weight: 700; color: var(--ink2);
+  cursor: pointer; transition: all .12s;
+}
+.preset-btn:hover { border-color: var(--sky); color: var(--sky); }
+.preset-btn.active { background: var(--violet); border-color: var(--violet); color: #fff; }
+
+.parent-filter-row {
+  display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: none;
+}
+.parent-lv-chip {
+  padding: 4px 10px; border-radius: 999px; font-size: 11.5px; font-weight: 800;
+  border: 1px solid var(--line); background: #15172a; color: var(--ink3);
+  cursor: pointer; white-space: nowrap;
+}
+.parent-lv-chip.active {
+  background: var(--violet); color: #fff; border-color: transparent;
+}
+
+.parent-list-tools {
+  display: flex; justify-content: space-between; align-items: center; font-size: 12px;
+  color: var(--ink3); font-weight: 700; padding: 2px 4px;
+}
+.parent-tool-btn {
+  background: none; border: none; color: var(--sky); cursor: pointer;
+  font-weight: 700; font-size: 12px; text-decoration: underline; margin-left: 8px;
+}
+
+.parent-word-list {
+  max-height: 250px; overflow-y: auto; border: 1px solid var(--line);
+  border-radius: 12px; background: #15172a; display: flex; flex-direction: column;
+}
+.parent-word-item {
+  display: flex; align-items: center; gap: 10px; padding: 8px 12px;
+  border-bottom: 1px solid #1f2338; cursor: pointer; transition: background .1s;
+}
+.parent-word-item:hover { background: #1b1e33; }
+.parent-word-item input[type="checkbox"] {
+  accent-color: var(--violet); width: 16px; height: 16px; cursor: pointer;
+}
+.parent-word-item .p-w-text {
+  font-weight: 800; font-size: 14px; color: var(--ink); min-width: 100px;
+}
+.parent-word-item .p-w-zh {
+  font-size: 13px; color: var(--ink2); flex: 1; overflow: hidden;
+  text-overflow: ellipsis; white-space: nowrap;
+}
+.parent-word-item .p-w-lv {
+  font-size: 10.5px; font-weight: 800; padding: 2px 7px; border-radius: 6px;
+  color: #fff; flex: none;
+}
+.parent-word-item .p-w-badge {
+  font-size: 11px; color: var(--marker); flex: none;
+}
+
+.parent-selected-box {
+  background: #15172a; border: 1px solid var(--line); border-radius: 12px;
+  padding: 10px 14px;
+}
+.parent-selected-title {
+  font-size: 12px; font-weight: 800; color: var(--ink2); display: flex;
+  justify-content: space-between; margin-bottom: 6px;
+}
+.parent-chips-bar {
+  display: flex; flex-wrap: wrap; gap: 6px; max-height: 90px; overflow-y: auto;
+}
+.parent-chip {
+  display: inline-flex; align-items: center; gap: 5px;
+  background: #252840; border: 1px solid #363a52; border-radius: 8px;
+  padding: 3px 8px; font-size: 12px; font-weight: 700; color: var(--ink);
+}
+.parent-chip .rm {
+  color: var(--ink3); cursor: pointer; font-size: 12px; font-weight: 800;
+}
+.parent-chip .rm:hover { color: var(--coral); }
+
+.parent-custom-area {
+  display: flex; flex-direction: column; gap: 10px;
+}
+.parent-textarea {
+  width: 100%; min-height: 120px; border-radius: 12px; border: 1.5px solid var(--line);
+  background: #15172a; color: var(--ink); font-family: ui-monospace, monospace;
+  font-size: 14px; padding: 12px; outline: none; resize: vertical; box-sizing: border-box;
+}
+.parent-textarea:focus {
+  border-color: var(--violet); box-shadow: 0 0 0 3px rgba(139,108,240,0.2);
+}
+
+.parent-goal-row {
+  display: flex; align-items: center; gap: 10px; font-size: 13px; font-weight: 700; color: var(--ink2);
+}
+.parent-goal-input {
+  width: 70px; padding: 6px 8px; border-radius: 8px; border: 1px solid var(--line);
+  background: #15172a; color: var(--ink); text-align: center; font-weight: 800; outline: none;
+}
+
+.parent-foot {
+  padding: 14px 20px; border-top: 1px solid var(--line);
+  display: flex; gap: 10px; justify-content: flex-end; align-items: center; flex-wrap: wrap;
+  background: #15172a;
+}
+
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 @media (max-width:520px){
   .stats{width:100%;margin:8px 0 0} header{flex-wrap:wrap}
   .title h1{font-size:20px} .tile{width:40px;height:48px;font-size:22px}
   .lvchip{min-width:96px} .banner .gate{flex-wrap:wrap} .banner .challenge{margin-left:0;width:100%}
+  .parent-foot { justify-content: stretch; }
+  .parent-foot .btn { width: 100%; }
 }
